@@ -1,0 +1,3 @@
+module FBS_HKUST_SPIDER
+
+go 1.22.2

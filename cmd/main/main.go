@@ -1,7 +1,7 @@
 package main
 
 import (
-	"FBS_HKUST_SPIDER/provider"
+	alumni "FBS_HKUST_SPIDER/internal/alumni"
 	"fmt"
 	"time"
 )
@@ -45,7 +45,7 @@ func waitUntilTargetTime() {
 func main() {
 	// 可选的 facilityID 列表
 	facilityIDs := []string{"2", "3", "4", "5"}
-	provider.Booking("2", "19:00", "20:00", "2021-09-30")
+	alumni.Booking("2", "19:00", "20:00", "2021-09-30")
 
 	// 持续运行
 	for {
@@ -69,7 +69,7 @@ func main() {
 				for _, facilityID := range facilityIDs {
 					fmt.Println(facilityID, nextWeekDate)
 					// 依次发送请求
-					err := provider.Booking(facilityID, "19:00", "20:00", nextWeekDate)
+					err := alumni.Booking(facilityID, "19:00", "20:00", nextWeekDate)
 					if err != nil {
 						fmt.Printf("Error booking for facility %s: %v\n", facilityID, err)
 					} else {

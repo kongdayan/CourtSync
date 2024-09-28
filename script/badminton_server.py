@@ -3,7 +3,7 @@ from flask_socketio import SocketIO, emit
 from datetime import datetime, timedelta, time
 import json
 import requests
-from config import user_tokens, user_header, location_dict, push_config
+from script.config import user_tokens, user_header, location_dict, push_config
 from threading import Thread, Event
 
 app = Flask(__name__)

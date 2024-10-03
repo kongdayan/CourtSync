@@ -1,4 +1,4 @@
-package provider
+package alumni
 
 import (
 	"bytes"
@@ -9,7 +9,7 @@ import (
 )
 
 // TimeSlot 结构体用于解析 JSON 返回的场地时间段信息
-type TimeSlot struct {
+type AlumniTimeSlot struct {
 	FacilityID  string `json:"facility_id"`
 	Date        string `json:"date"`
 	StartTime   string `json:"start_time"`
@@ -25,7 +25,7 @@ type FacilityTimeslotsResponse struct {
 		Message string `json:"message"`
 	} `json:"meta"`
 	Data struct {
-		FacilityTimeslots []TimeSlot `json:"facility_timeslots"`
+		FacilityTimeslots []AlumniTimeSlot `json:"facility_timeslots"`
 	} `json:"data"`
 }
 
@@ -69,7 +69,7 @@ func Booking(facilityID, startTime, endTime, date string) error {
 }
 
 // GetAvailableTimeSlots 函数用于扫描空闲场地
-func GetAvailableTimeSlots(facilityID, startDate, endDate string) ([]TimeSlot, error) {
+func GetAvailableTimeSlots(facilityID, startDate, endDate string) ([]AlumniTimeSlot, error) {
 	url := fmt.Sprintf("https://w5.ab.ust.hk/msalum/api/app/fbs/facility-timeslots?facility_id=%s&start_date=%s&end_date=%s", facilityID, startDate, endDate)
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -100,7 +100,7 @@ func GetAvailableTimeSlots(facilityID, startDate, endDate string) ([]TimeSlot, e
 		return nil, fmt.Errorf("unexpected response code: %d", response.Meta.Code)
 	}
 
-	availableSlots := []TimeSlot{}
+	availableSlots := []AlumniTimeSlot{}
 	for _, slot := range response.Data.FacilityTimeslots {
 		if slot.Status == "Available" {
 			availableSlots = append(availableSlots, slot)

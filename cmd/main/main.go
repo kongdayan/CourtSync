@@ -44,63 +44,67 @@ func waitUntilTargetTime() {
 }
 
 func main() {
+	// Test Alumni Available
 	// availableSlots, err := alumni.GetAvailableTimeSlots("29", "2024-10-03", "2024-10-10")
 	// if err != nil {
 	// 	fmt.Println("Error:", err)
 	// 	return
 	// }
 	
+	// Test USThing Available
 	// for _, slot := range availableSlots {
 	// 	fmt.Printf("Available Slot: %s %s - %s\n", slot.Date, slot.StartTime, slot.EndTime)
 	// }
-	availableSlots, err := usthing.GetUSThingAvailableTimeslots("20789731", "01", "4", "2024-10-03", "2024-10-10")
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
 
-	// 输出可用的时间段
-	for _, slot := range availableSlots {
-		fmt.Printf("Available Slot: %s %s - %s\n", slot.TimeslotDate, slot.StartTime, slot.EndTime)
+	// availableSlots, err := usthing.GetUSThingAvailableTimeslots("20789731", "01", "4", "2024-10-03", "2024-10-10")
+	// if err != nil {
+	// 	fmt.Println("Error:", err)
+	// 	return
+	// }
+
+	// Print Available Time Slots
+	// 	for _, slot := range availableSlots {
+	// 	fmt.Printf("Available Slot: %s %s - %s\n", slot.TimeslotDate, slot.StartTime, slot.EndTime)
+	// }
+
+	// nextWeekDate := getNextWeekSameDay()
+	// 可选的 facilityID 列表
+	facilityIDs := []string{"2", "3", "4", "5"}
+	// usthing.Booking("","1",facilityIDs[2], nextWeekDate, "19:00", "20:00","N")
+
+	// 持续运行
+	for {
+		// 等待至每天 UTC+8 的 7:59:50
+		waitUntilTargetTime()
+
+		// 自动计算下一周的同一天
+		nextWeekDate := getNextWeekSameDay()
+		// usthing.Booking(" ",1,4, nextWeekDate, "19:00", "20:00","N")
+
+		// 开始发送请求
+		ticker := time.NewTicker(1 * time.Second) // 每秒发送一轮请求
+		stopTimer := time.After(20 * time.Second) // 在 20 秒后停止 (从 7:59:50 到 8:00:10 共计20秒)
+		done := false
+
+		for !done {
+			select {
+			case <-stopTimer:
+				fmt.Println("Stopping requests at 8:00:10 (UTC+8)")
+				done = true
+			case <-ticker.C:
+				for _, facilityID := range facilityIDs {
+					fmt.Println(facilityID, nextWeekDate)
+					// 依次发送请求
+					err := usthing.Booking("","1",facilityID, nextWeekDate, "19:00", "20:00","N")
+					if err != nil {
+						fmt.Printf("Error booking for facility %s: %v\n", facilityID, err)
+					} else {
+						fmt.Printf("Successfully booked for facility %s\n", facilityID)
+					}
+				}
+			}
+		}
+
+		ticker.Stop()
 	}
 }
-
-	// // 可选的 facilityID 列表
-	// facilityIDs := []string{"2", "3", "4", "5"}
-	// alumni.Booking("2", "19:00", "20:00", "2021-09-30")
-
-	// // 持续运行
-	// for {
-	// 	// 等待至每天 UTC+8 的 7:59:50
-	// 	waitUntilTargetTime()
-
-	// 	// 自动计算下一周的同一天
-	// 	nextWeekDate := getNextWeekSameDay()
-
-	// 	// 开始发送请求
-	// 	ticker := time.NewTicker(1 * time.Second) // 每秒发送一轮请求
-	// 	stopTimer := time.After(20 * time.Second) // 在 20 秒后停止 (从 7:59:50 到 8:00:10 共计20秒)
-	// 	done := false
-
-	// 	for !done {
-	// 		select {
-	// 		case <-stopTimer:
-	// 			fmt.Println("Stopping requests at 8:00:10 (UTC+8)")
-	// 			done = true
-	// 		case <-ticker.C:
-	// 			for _, facilityID := range facilityIDs {
-	// 				fmt.Println(facilityID, nextWeekDate)
-	// 				// 依次发送请求
-	// 				err := alumni.Booking(facilityID, "19:00", "20:00", nextWeekDate)
-	// 				if err != nil {
-	// 					fmt.Printf("Error booking for facility %s: %v\n", facilityID, err)
-	// 				} else {
-	// 					fmt.Printf("Successfully booked for facility %s\n", facilityID)
-	// 				}
-	// 			}
-	// 		}
-	// 	}
-
-	// 	ticker.Stop()
-	// }
-// }

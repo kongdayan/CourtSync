@@ -17,7 +17,7 @@ type USThingTimeSlot struct {
 	ActivityName   string `json:"activityName"`
 }
 
-// USThingTimeslotResponse 结构体用于解析 API 返回的完整 JSON 响应
+// USThingTimeslotResponse 结构体用于解析 扫场请求的 JSON 响应
 type USThingTimeslotResponse struct {
 	Status      string            `json:"status"`
 	Message     string            `json:"message"`
@@ -27,6 +27,24 @@ type USThingTimeslotResponse struct {
 	StartDate   string            `json:"startDate"`
 	EndDate     string            `json:"endDate"`
 	TimeSlots   []USThingTimeSlot `json:"timeslot"`
+}
+
+// USThingBookingResponse 结构体用于解析 Booking请求的 JSON 响应
+type USThingBookingResponse struct {
+	Status       string        `json:"status"`
+	Message      string        `json:"message"`
+	ErrorCode    string        `json:"errorCode"`
+	TotalRecord  int           `json:"totalRecord"`
+	UserType     string        `json:"userType"`
+	UstID        string        `json:"ustID"`
+	EmailAddr    string        `json:"emailAddr"`
+	FacilityID   int           `json:"facilityID"`
+	TimeslotDate string        `json:"timeslotDate"`
+	StartTime    string        `json:"startTime"`
+	EndTime      string        `json:"endTime"`
+	BookingRef   int           `json:"bookingRef"`
+	CancelInd    *string       `json:"cancelInd"`  // 因为 cancelInd 可以为 null，所以使用指针类型
+	BookingResult []interface{} `json:"bookingResult"`
 }
 
 // GenerateHeaders 生成通用的 HTTP 请求头
@@ -89,15 +107,15 @@ func GetUSThingAvailableTimeslots(ustID, userType, facilityID, startDate, endDat
 	return availableSlots, nil
 }
 
-// USThingBooking 函数，负责发送 HTTP POST 请求，预定场地
-func Booking(ustID, userType, facilityID, timeslotDate, startTime, endTime, cancelInd string) error {
+// USThingBooking 函数，负责发送 HTTP POST 请求，预定场地并返回解析后的响应
+func Booking(ustID, userType, facilityID, timeslotDate, startTime, endTime, cancelInd string) (*USThingBookingResponse, error) {
 	// API URL
 	url := fmt.Sprintf("https://ms.api.usthing.xyz/v1/fbs/book?ustID=%s&userType=%s&facilityID=%s&timeslotDate=%s&startTime=%s&endTime=%s&cancelInd=%s", ustID, userType, facilityID, timeslotDate, startTime, endTime, cancelInd)
 
 	// 创建一个新的 HTTP POST 请求
 	req, err := http.NewRequest("POST", url, nil)
 	if err != nil {
-		return fmt.Errorf("error creating request: %v", err)
+		return nil, fmt.Errorf("error creating request: %v", err)
 	}
 
 	// 复用 header
@@ -107,15 +125,33 @@ func Booking(ustID, userType, facilityID, timeslotDate, startTime, endTime, canc
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("error sending request: %v", err)
+		return nil, fmt.Errorf("error sending request: %v", err)
 	}
 	defer resp.Body.Close()
 
+	// 读取响应体
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %v", err)
+	}
+
+	// 检查 HTTP 响应状态
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("received non-OK HTTP status: %s", resp.Status)
+		return nil, fmt.Errorf("received non-OK HTTP status: %s, body: %s", resp.Status, string(body))
+	}
+
+	// 解析 JSON 响应
+	var bookingResponse USThingBookingResponse
+	if err := json.Unmarshal(body, &bookingResponse); err != nil {
+		return nil, fmt.Errorf("error parsing JSON response: %v", err)
+	}
+
+	// 检查 API 返回的状态码
+	if bookingResponse.Status != "200" {
+		return nil, fmt.Errorf("API returned an error: %s, message: %s", bookingResponse.ErrorCode, bookingResponse.Message)
 	}
 
 	fmt.Println("Booking successful!")
 
-	return nil
+	return &bookingResponse, nil
 }

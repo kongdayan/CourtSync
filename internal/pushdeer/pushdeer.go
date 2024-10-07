@@ -14,7 +14,6 @@ var facilityMap = map[string]string{
 	"3":  "LG1C2",
 	"4":  "LG1C3",
 	"5":  "LG1C4",
-	"29": "LG4C1",
 	"79": "LG1-C5",
 	"80": "LG1-C6",
 }

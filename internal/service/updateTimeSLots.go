@@ -71,7 +71,7 @@ func GetNextWeekSameDay() string {
 // UpdateTimeSlots 获取所有场地下周同一天的时间段，并转换为统一格式
 func UpdateTimeSlots() ([]UnifiedTimeSlot, error) {
 	// 定义需要循环的场地 ID
-	facilityIDs := []string{"29", "3", "4", "5"}
+	facilityIDs := []string{"2", "3", "4", "5"}
 
 	// 存放所有合并的时间段
 	var allAlumniSlots []alumni.AlumniTimeSlot

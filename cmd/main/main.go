@@ -3,7 +3,8 @@ package main
 import (
 	// alumni "FBS_HKUST_SPIDER/internal/alumni"
 
-	"FBS_HKUST_SPIDER/internal/service"
+	pushdeer "FBS_HKUST_SPIDER/internal/pushdeer"
+	service "FBS_HKUST_SPIDER/internal/service"
 	"fmt"
 	"time"
 )
@@ -45,15 +46,26 @@ func waitUntilTargetTime() {
 }
 
 func main() {
-	availableTimeSlots, err := service.UpdateTimeSlots()
+	// PushDeer PushKey 列表
+	pushKeys := []string{
+		"PDU6737T1Qnk6LJpLDpreHNd9JM0voDWIT1cs8SB",
+		// 添加更多 PushKey...
+	}
+
+	// 创建 PushDeerService
+	pushDeerService := pushdeer.NewPushDeerService(pushKeys)
+
+	// 调用 UpdateTimeSlots 函数，获取可用的时间段
+	unifiedSlots, err := service.UpdateTimeSlots()
 	if err != nil {
 		fmt.Println("Error updating timeslots:", err)
 		return
 	}
 
-	// 遍历并打印可用的时间段
-	for _, timeSlot := range availableTimeSlots {
-		fmt.Println(timeSlot.String())
+	// 调用 PushDeerService 推送结果
+	err = pushDeerService.PushTimeSlots(unifiedSlots)
+	if err != nil {
+		fmt.Println("Error pushing timeslots:", err)
 	}
 
 	// // 遍历并打印所有可用的时间段

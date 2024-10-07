@@ -2,7 +2,8 @@ package main
 
 import (
 	// alumni "FBS_HKUST_SPIDER/internal/alumni"
-	usthing "FBS_HKUST_SPIDER/internal/usthing"
+
+	"FBS_HKUST_SPIDER/internal/service"
 	"fmt"
 	"time"
 )
@@ -44,13 +45,22 @@ func waitUntilTargetTime() {
 }
 
 func main() {
-	// Test Alumni Available
-	// availableSlots, err := alumni.GetAvailableTimeSlots("29", "2024-10-03", "2024-10-10")
-	// if err != nil {
-	// 	fmt.Println("Error:", err)
-	// 	return
+	availableTimeSlots, err := service.UpdateTimeSlots()
+	if err != nil {
+		fmt.Println("Error updating timeslots:", err)
+		return
+	}
+
+	// 遍历并打印可用的时间段
+	for _, timeSlot := range availableTimeSlots {
+		fmt.Println(timeSlot.String())
+	}
+
+	// // 遍历并打印所有可用的时间段
+	// for _, timeSlot := range availableTimeSlots {
+	// 	fmt.Printf("FacilityID: %s, Date: %s, StartTime: %s, EndTime: %s\n", timeSlot.FacilityID, timeSlot.Date, timeSlot.StartTime, timeSlot.EndTime)
 	// }
-	
+
 	// Test USThing Available
 	// for _, slot := range availableSlots {
 	// 	fmt.Printf("Available Slot: %s %s - %s\n", slot.Date, slot.StartTime, slot.EndTime)
@@ -67,16 +77,15 @@ func main() {
 	// 	fmt.Printf("Available Slot: %s %s - %s\n", slot.TimeslotDate, slot.StartTime, slot.EndTime)
 	// }
 
-
 	// Test USThing Booking
-	response, err := usthing.Booking("", "01", "4", "2024-10-11", "18:00", "19:00", "N")
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
+	// response, err := usthing.Booking("", "01", "4", "2024-10-11", "18:00", "19:00", "N")
+	// if err != nil {
+	// 	fmt.Println("Error:", err)
+	// 	return
+	// }
 
 	// 输出预定结果
-	fmt.Printf("Booking Response: %+v\n", response)
+	// fmt.Printf("Booking Response: %+v\n", response)
 
 	// nextWeekDate := getNextWeekSameDay()
 	// 可选的 facilityID 列表

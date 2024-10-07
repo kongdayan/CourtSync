@@ -9,38 +9,26 @@ import (
 	"time"
 )
 
-// getNextWeekSameDay 函数，计算下一周的同一天日期
-func getNextWeekSameDay() string {
-	// 获取当前日期
-	today := time.Now()
-
-	// 增加 7 天，得到下一周的同一天
-	nextWeek := today.AddDate(0, 0, 7)
-
-	// 格式化日期为 YYYY-MM-DD 格式
-	return nextWeek.Format("2006-01-02")
-}
-
-// 获取目标时间并等待至指定的时间点
+// 等待到指定的目标时间
 func waitUntilTargetTime() {
 	for {
 		now := time.Now()
-		// 计算当天 UTC+8 的 7:59:50 时间
-		target := time.Date(now.Year(), now.Month(), now.Day(), 7, 59, 50, 0, time.FixedZone("UTC+8", 8*3600))
+		// 定义目标时间为 UTC+8 的 8:00:10
+		target := time.Date(now.Year(), now.Month(), now.Day(), 8, 00, 10, 0, time.FixedZone("UTC+8", 8*3600))
 
-		// 如果已经过了今天的目标时间，等待明天的目标时间
+		// 如果当前时间已经超过了目标时间，则等待明天的同一时间
 		if now.After(target) {
 			target = target.Add(24 * time.Hour)
 		}
 
-		// 计算需要睡眠的时间
+		// 计算到目标时间的剩余时间
 		sleepDuration := time.Until(target)
 		fmt.Printf("Waiting until %s (UTC+8)...\n", target.Format("15:04:05"))
 
-		// 睡眠至目标时间
+		// 睡眠到目标时间
 		time.Sleep(sleepDuration)
 
-		// 到达目标时间后，返回
+		// 到达目标时间后，退出函数
 		return
 	}
 }
@@ -55,88 +43,39 @@ func main() {
 	// 创建 PushDeerService
 	pushDeerService := pushdeer.NewPushDeerService(pushKeys)
 
-	// 调用 UpdateTimeSlots 函数，获取可用的时间段
-	unifiedSlots, err := service.UpdateTimeSlots()
-	if err != nil {
-		fmt.Println("Error updating timeslots:", err)
-		return
+	// 创建一个 Ticker，每隔 1 分钟触发一次
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+
+	// 无限循环以定期运行任务
+	for {
+		now := time.Now()
+		hour := now.Hour()
+
+		// 如果当前时间在 8:00 到 22:00 之间，执行任务
+		if hour >= 8 && hour < 22 {
+			fmt.Println("开始执行任务: ", now)
+
+			// 调用 UpdateTimeSlots 函数，获取可用的时间段
+			unifiedSlots, err := service.UpdateTimeSlots()
+			if err != nil {
+				fmt.Println("Error updating timeslots:", err)
+				continue
+			}
+
+			// 调用 PushDeerService 推送结果
+			err = pushDeerService.PushTimeSlots(unifiedSlots)
+			if err != nil {
+				fmt.Println("Error pushing timeslots:", err)
+			}
+
+			// 休眠1分钟后再次检查并执行任务
+			time.Sleep(1 * time.Minute)
+
+		} else {
+			// 如果当前时间晚于 22:00 或早于 8:00，则等待到第二天 8:00
+			fmt.Println("当前时间不在 8:00 到 22:00 之间，进入休眠...")
+			waitUntilTargetTime()
+		}
 	}
-
-	// 调用 PushDeerService 推送结果
-	err = pushDeerService.PushTimeSlots(unifiedSlots)
-	if err != nil {
-		fmt.Println("Error pushing timeslots:", err)
-	}
-
-	// // 遍历并打印所有可用的时间段
-	// for _, timeSlot := range availableTimeSlots {
-	// 	fmt.Printf("FacilityID: %s, Date: %s, StartTime: %s, EndTime: %s\n", timeSlot.FacilityID, timeSlot.Date, timeSlot.StartTime, timeSlot.EndTime)
-	// }
-
-	// Test USThing Available
-	// for _, slot := range availableSlots {
-	// 	fmt.Printf("Available Slot: %s %s - %s\n", slot.Date, slot.StartTime, slot.EndTime)
-	// }
-
-	// availableSlots, err := usthing.GetUSThingAvailableTimeslots("20789731", "01", "4", "2024-10-03", "2024-10-10")
-	// if err != nil {
-	// 	fmt.Println("Error:", err)
-	// 	return
-	// }
-
-	// Print Available Time Slots
-	// 	for _, slot := range availableSlots {
-	// 	fmt.Printf("Available Slot: %s %s - %s\n", slot.TimeslotDate, slot.StartTime, slot.EndTime)
-	// }
-
-	// Test USThing Booking
-	// response, err := usthing.Booking("", "01", "4", "2024-10-11", "18:00", "19:00", "N")
-	// if err != nil {
-	// 	fmt.Println("Error:", err)
-	// 	return
-	// }
-
-	// 输出预定结果
-	// fmt.Printf("Booking Response: %+v\n", response)
-
-	// nextWeekDate := getNextWeekSameDay()
-	// 可选的 facilityID 列表
-	// facilityIDs := []string{"2", "3", "4", "5"}
-	// usthing.Booking("","1",facilityIDs[2], nextWeekDate, "19:00", "20:00","N")
-
-	// 持续运行
-	// for {
-	// 	// 等待至每天 UTC+8 的 7:59:50
-	// 	// waitUntilTargetTime()
-
-	// 	// 自动计算下一周的同一天
-	// 	nextWeekDate := getNextWeekSameDay()
-	// 	// usthing.Booking(" ",1,4, nextWeekDate, "19:00", "20:00","N")
-
-	// 	// 开始发送请求
-	// 	ticker := time.NewTicker(1 * time.Second) // 每秒发送一轮请求
-	// 	stopTimer := time.After(20 * time.Second) // 在 20 秒后停止 (从 7:59:50 到 8:00:10 共计20秒)
-	// 	done := false
-
-	// 	for !done {
-	// 		select {
-	// 		case <-stopTimer:
-	// 			fmt.Println("Stopping requests at 8:00:10 (UTC+8)")
-	// 			done = true
-	// 		case <-ticker.C:
-	// 			for _, facilityID := range facilityIDs {
-	// 				fmt.Println(facilityID, nextWeekDate)
-	// 				// 依次发送请求
-	// 				err := usthing.Booking("","1",facilityID, nextWeekDate, "19:00", "20:00","N")
-	// 				if err != nil {
-	// 					fmt.Printf("Error booking for facility %s: %v\n", facilityID, err)
-	// 				} else {
-	// 					fmt.Printf("Successfully booked for facility %s\n", facilityID)
-	// 				}
-	// 			}
-	// 		}
-	// 	}
-
-	// 	ticker.Stop()
-	// }
 }

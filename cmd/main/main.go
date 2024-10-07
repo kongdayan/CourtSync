@@ -9,6 +9,14 @@ import (
 	"time"
 )
 
+// 获取当前时间（UTC+8）
+func getCurrentTimeInUTC8() time.Time {
+	// 定义 UTC+8 时区
+	utc8 := time.FixedZone("UTC+8", 8*3600)
+	// 获取当前 UTC 时间，并将其转换为 UTC+8
+	return time.Now().In(utc8)
+}
+
 // 等待到指定的目标时间
 func waitUntilTargetTime() {
 	for {
@@ -49,7 +57,7 @@ func main() {
 
 	// 无限循环以定期运行任务
 	for {
-		now := time.Now()
+		now := getCurrentTimeInUTC8()
 		hour := now.Hour()
 
 		// 如果当前时间在 8:00 到 22:00 之间，执行任务

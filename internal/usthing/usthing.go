@@ -1,51 +1,11 @@
 package usthing
 
 import (
-	"net/http"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
+	"net/http"
 )
-
-// TimeSlot 结构体用于解析 JSON 返回的场地时间段信息
-type USThingTimeSlot struct {
-	FacilityID     int    `json:"facilityID"`
-	TimeslotDate   string `json:"timeslotDate"`
-	StartTime      string `json:"startTime"`
-	EndTime        string `json:"endTime"`
-	TimeslotStatus string `json:"timeslotStatus"`
-	ActivityName   string `json:"activityName"`
-}
-
-// USThingTimeslotResponse 结构体用于解析 扫场请求的 JSON 响应
-type USThingTimeslotResponse struct {
-	Status      string            `json:"status"`
-	Message     string            `json:"message"`
-	FacilityID  int               `json:"facilityID"`
-	UserType    string            `json:"userType"`
-	UstID       string            `json:"ustID"`
-	StartDate   string            `json:"startDate"`
-	EndDate     string            `json:"endDate"`
-	TimeSlots   []USThingTimeSlot `json:"timeslot"`
-}
-
-// USThingBookingResponse 结构体用于解析 Booking请求的 JSON 响应
-type USThingBookingResponse struct {
-	Status       string        `json:"status"`
-	Message      string        `json:"message"`
-	ErrorCode    string        `json:"errorCode"`
-	TotalRecord  int           `json:"totalRecord"`
-	UserType     string        `json:"userType"`
-	UstID        string        `json:"ustID"`
-	EmailAddr    string        `json:"emailAddr"`
-	FacilityID   int           `json:"facilityID"`
-	TimeslotDate string        `json:"timeslotDate"`
-	StartTime    string        `json:"startTime"`
-	EndTime      string        `json:"endTime"`
-	BookingRef   int           `json:"bookingRef"`
-	CancelInd    *string       `json:"cancelInd"`  // 因为 cancelInd 可以为 null，所以使用指针类型
-	BookingResult []interface{} `json:"bookingResult"`
-}
 
 // GenerateHeaders 生成通用的 HTTP 请求头
 func GenerateHeaders() http.Header {
@@ -60,8 +20,48 @@ func GenerateHeaders() http.Header {
 	return headers
 }
 
+// TimeSlot 结构体用于解析 JSON 返回的场地时间段信息
+type USThingTimeSlot struct {
+	FacilityID     int    `json:"facilityID"`
+	TimeslotDate   string `json:"timeslotDate"`
+	StartTime      string `json:"startTime"`
+	EndTime        string `json:"endTime"`
+	TimeslotStatus string `json:"timeslotStatus"`
+	ActivityName   string `json:"activityName"`
+}
+
+// USThingTimeslotResponse 结构体用于解析 扫场请求的 JSON 响应
+type USThingTimeslotResponse struct {
+	Status     string            `json:"status"`
+	Message    string            `json:"message"`
+	FacilityID int               `json:"facilityID"`
+	UserType   string            `json:"userType"`
+	UstID      string            `json:"ustID"`
+	StartDate  string            `json:"startDate"`
+	EndDate    string            `json:"endDate"`
+	TimeSlots  []USThingTimeSlot `json:"timeslot"`
+}
+
+// USThingBookingResponse 结构体用于解析 Booking请求的 JSON 响应
+type USThingBookingResponse struct {
+	Status        string        `json:"status"`
+	Message       string        `json:"message"`
+	ErrorCode     string        `json:"errorCode"`
+	TotalRecord   int           `json:"totalRecord"`
+	UserType      string        `json:"userType"`
+	UstID         string        `json:"ustID"`
+	EmailAddr     string        `json:"emailAddr"`
+	FacilityID    int           `json:"facilityID"`
+	TimeslotDate  string        `json:"timeslotDate"`
+	StartTime     string        `json:"startTime"`
+	EndTime       string        `json:"endTime"`
+	BookingRef    int           `json:"bookingRef"`
+	CancelInd     *string       `json:"cancelInd"` // 因为 cancelInd 可以为 null，所以使用指针类型
+	BookingResult []interface{} `json:"bookingResult"`
+}
+
 // GetUSThingAvailableTimeslots 函数用于扫描空闲场地
-func GetUSThingAvailableTimeslots(ustID, userType, facilityID, startDate, endDate string) ([]USThingTimeSlot, error) {
+func GetAvailableTimeSlots(ustID, userType, facilityID, startDate, endDate string) ([]USThingTimeSlot, error) {
 	url := fmt.Sprintf("https://ms.api.usthing.xyz/v1/fbs/facilityTimeslot?ustID=%s&userType=%s&facilityID=%s&startDate=%s&endDate=%s", ustID, userType, facilityID, startDate, endDate)
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -80,7 +80,7 @@ func GetUSThingAvailableTimeslots(ustID, userType, facilityID, startDate, endDat
 	defer resp.Body.Close()
 
 	// 读取响应
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error reading response: %v", err)
 	}
@@ -130,7 +130,7 @@ func Booking(ustID, userType, facilityID, timeslotDate, startTime, endTime, canc
 	defer resp.Body.Close()
 
 	// 读取响应体
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error reading response body: %v", err)
 	}
@@ -146,12 +146,13 @@ func Booking(ustID, userType, facilityID, timeslotDate, startTime, endTime, canc
 		return nil, fmt.Errorf("error parsing JSON response: %v", err)
 	}
 
-	// 检查 API 返回的状态码
-	if bookingResponse.Status != "200" {
-		return nil, fmt.Errorf("API returned an error: %s, message: %s", bookingResponse.ErrorCode, bookingResponse.Message)
+	// 检查 API 返回的 status 字段
+	if bookingResponse.Status == "200" {
+		fmt.Println("Booking successful!")
+	} else {
+		// 如果 status 不为 200，输出错误信息
+		fmt.Printf("Booking failed: %s\n", bookingResponse.Message)
 	}
-
-	fmt.Println("Booking successful!")
 
 	return &bookingResponse, nil
 }

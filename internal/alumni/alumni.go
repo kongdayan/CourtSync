@@ -4,22 +4,38 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 )
 
+// GenerateHeaders 生成通用的 HTTP 请求头
+func GenerateHeaders() http.Header {
+	headers := http.Header{}
+	headers.Set("Content-Type", "application/json")
+	headers.Set("Authorization", "Bearer oEtjM9HkL9aaEnEyabD8")
+	return headers
+}
+
+// AlumniBookingResponse 结构体用于解析 API 返回的 JSON 响应
+type AlumniBookingResponse struct {
+	Meta struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+	} `json:"meta"`
+}
+
 // TimeSlot 结构体用于解析 JSON 返回的场地时间段信息
 type AlumniTimeSlot struct {
-	FacilityID  string `json:"facility_id"`
-	Date        string `json:"date"`
-	StartTime   string `json:"start_time"`
-	EndTime     string `json:"end_time"`
-	Status      string `json:"status"`
+	FacilityID   string `json:"facility_id"`
+	Date         string `json:"date"`
+	StartTime    string `json:"start_time"`
+	EndTime      string `json:"end_time"`
+	Status       string `json:"status"`
 	ActivityName string `json:"activity_name"`
 }
 
 // FacilityTimeslotsResponse 结构体用于解析 API 返回的完整 JSON 响应
-type FacilityTimeslotsResponse struct {
+type AlumniGetAvailableTimeSlotsResponse struct {
 	Meta struct {
 		Code    int    `json:"code"`
 		Message string `json:"message"`
@@ -29,47 +45,64 @@ type FacilityTimeslotsResponse struct {
 	} `json:"data"`
 }
 
-// Booking 函数，负责发送 HTTP POST 请求，预定场地
-func Booking(facilityID, startTime, endTime, date string) error {
+// Booking 函数，负责发送 HTTP POST 请求，预定场地并返回解析后的响应
+func Booking(facilityID, startTime, endTime, date string) (*AlumniBookingResponse, error) {
 	url := "https://w5.ab.ust.hk/msalum/api/app/fbs/bookings"
 
+	// 构建请求体的 JSON 数据
 	jsonData := []byte(fmt.Sprintf(`{
-      "booking": {
-        "facility_id": "%s",
-        "start_time": "%s",
-        "end_time": "%s",
-        "date": "%s"
-      }
-    }`, facilityID, startTime, endTime, date))
+		"booking": {
+			"facility_id": "%s",
+			"start_time": "%s",
+			"end_time": "%s",
+			"date": "%s"
+		}
+	}`, facilityID, startTime, endTime, date))
 
+	// 创建 HTTP POST 请求
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
-		return fmt.Errorf("error creating request: %v", err)
+		return nil, fmt.Errorf("error creating request: %v", err)
 	}
 
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer oEtjM9HkL9aaEnEyabD8")
+	// 添加请求头信息
+	req.Header = GenerateHeaders()
 
+	// 发送请求并获取响应
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("error sending request: %v", err)
+		return nil, fmt.Errorf("error sending request: %v", err)
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	// 读取响应体
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("error reading response: %v", err)
+		return nil, fmt.Errorf("error reading response: %v", err)
 	}
 
-	fmt.Println("Response Status:", resp.Status)
-	fmt.Println("Response Body:", string(body))
+	// 解析 JSON 响应
+	var bookingResponse AlumniBookingResponse
+	if err := json.Unmarshal(body, &bookingResponse); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
 
-	return nil
+	// 检查 API 返回的状态码
+	if bookingResponse.Meta.Code == 200 {
+		fmt.Println("Booking成功")
+	} else if bookingResponse.Meta.Code == 400 {
+		fmt.Printf("Booking失败: %s\n", bookingResponse.Meta.Message)
+	} else {
+		fmt.Printf("Unexpected response code: %d\n", bookingResponse.Meta.Code)
+	}
+
+	return &bookingResponse, nil
 }
 
-// GetAvailableTimeSlots 函数用于扫描空闲场地
+// GetAvailableTimeSlots 获得某个场地在某个日期范围内的可用时间段
 func GetAvailableTimeSlots(facilityID, startDate, endDate string) ([]AlumniTimeSlot, error) {
+	// 扫描 某个指定 facilityID 一段日期内的预定情况 (最长可一周)
 	url := fmt.Sprintf("https://w5.ab.ust.hk/msalum/api/app/fbs/facility-timeslots?facility_id=%s&start_date=%s&end_date=%s", facilityID, startDate, endDate)
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -77,7 +110,7 @@ func GetAvailableTimeSlots(facilityID, startDate, endDate string) ([]AlumniTimeS
 		return nil, fmt.Errorf("error creating request: %v", err)
 	}
 
-	req.Header.Set("Authorization", "Bearer oEtjM9HkL9aaEnEyabD8")
+	req.Header = GenerateHeaders()
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -86,12 +119,12 @@ func GetAvailableTimeSlots(facilityID, startDate, endDate string) ([]AlumniTimeS
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error reading response: %v", err)
 	}
 
-	var response FacilityTimeslotsResponse
+	var response AlumniGetAvailableTimeSlotsResponse
 	if err := json.Unmarshal(body, &response); err != nil {
 		return nil, fmt.Errorf("error parsing response: %v", err)
 	}

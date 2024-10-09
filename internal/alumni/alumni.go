@@ -2,6 +2,7 @@ package alumni
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -112,7 +113,12 @@ func GetAvailableTimeSlots(facilityID, startDate, endDate string) ([]AlumniTimeS
 
 	req.Header = GenerateHeaders()
 
-	client := &http.Client{}
+	// 临时禁用证书验证
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: tr}
+
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("error sending request: %v", err)

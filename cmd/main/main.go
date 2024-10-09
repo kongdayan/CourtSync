@@ -22,7 +22,7 @@ func waitUntilTargetTime() {
 	for {
 		now := time.Now()
 		// 定义目标时间为 UTC+8 的 8:00:10
-		target := time.Date(now.Year(), now.Month(), now.Day(), 8, 00, 10, 0, time.FixedZone("UTC+8", 8*3600))
+		target := time.Date(now.Year(), now.Month(), now.Day(), 7, 59, 59, 0, time.FixedZone("UTC+8", 8*3600))
 
 		// 如果当前时间已经超过了目标时间，则等待明天的同一时间
 		if now.After(target) {
@@ -45,6 +45,8 @@ func main() {
 	// PushDeer PushKey 列表
 	pushKeys := []string{
 		"PDU6737T1Qnk6LJpLDpreHNd9JM0voDWIT1cs8SB",
+		"PDU25946T0PBE2qYUzkfE0UPDqtJtjmJEKQMEGgrx",
+		"PDU20193TuD3dWVREr3BgOZJ8y1zvL1XGMCERhN3P",
 		// 添加更多 PushKey...
 	}
 

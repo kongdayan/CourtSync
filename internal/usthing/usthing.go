@@ -125,6 +125,7 @@ func Booking(ustID, userType, facilityID, timeslotDate, startTime, endTime, canc
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
+		fmt.Println(resp.Status)
 		return nil, fmt.Errorf("error sending request: %v", err)
 	}
 	defer resp.Body.Close()

@@ -74,7 +74,9 @@ func UpdateTimeSlots() ([]UnifiedTimeSlot, error) {
 	facilityIDs := []string{"2", "3", "4", "5"}
 
 	// 存放所有合并的时间段
-	var allAlumniSlots []alumni.AlumniTimeSlot
+	//var allAlumniSlots []alumni.AlumniTimeSlot
+
+	var allUSThingSlots []usthing.USThingTimeSlot
 
 	// 获取当前日期
 	toDay := time.Now().Format("2006-01-02")
@@ -84,17 +86,20 @@ func UpdateTimeSlots() ([]UnifiedTimeSlot, error) {
 
 	// 遍历每个场地 ID，获取时间段并合并
 	for _, facilityID := range facilityIDs {
-		slots, err := alumni.GetAvailableTimeSlots(facilityID, toDay, nextWeekDate)
+		slots, err := usthing.GetAvailableTimeSlots("", "01", facilityID, toDay, nextWeekDate)
+		//slots, err := alumni.GetAvailableTimeSlots(facilityID, toDay, nextWeekDate)
 		if err != nil {
 			return nil, fmt.Errorf("error fetching timeslots for facility %s: %v", facilityID, err)
 		}
 
 		// 合并时间段
-		allAlumniSlots = append(allAlumniSlots, slots...)
+		//allAlumniSlots = append(allAlumniSlots, slots...)
+		allUSThingSlots = append(allUSThingSlots, slots...)
 	}
 
 	// 将合并的所有时间段转换为 UnifiedTimeSlot
-	unifiedSlots := ConvertAlumniToUnified(allAlumniSlots)
+	//unifiedSlots := ConvertAlumniToUnified(allAlumniSlots)
+	unifiedSlots := ConvertUSThingToUnified(allUSThingSlots)
 
 	return unifiedSlots, nil
 }

@@ -2,6 +2,9 @@ package jiushi
 
 import (
 	"bytes"
+	"crypto/md5"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -62,6 +65,22 @@ type VenueResponse struct {
 }
 
 // QueryVenueData queries the API for venue data
+// generateJsSign 生成请求签名
+func generateJsSign(payload map[string]interface{}) (string, error) {
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return "", fmt.Errorf("error marshalling payload for sign: %v", err)
+	}
+
+	// 使用与 sign.py 相同的算法生成签名
+	h := md5.New()
+	h.Write([]byte(string(payloadBytes) + "527093093C418483029EEC61F70E9DD1"))
+	d_sign := h.Sum(nil)
+
+	// Base64 编码
+	return base64.StdEncoding.EncodeToString([]byte(hex.EncodeToString(d_sign))), nil
+}
+
 func QueryVenueData(venueId string, bookTime int64) (*VenueResponse, error) {
 	url := "https://jsapp.jussyun.com/jiushi-core/venue/getVenueGround"
 
@@ -70,10 +89,18 @@ func QueryVenueData(venueId string, bookTime int64) (*VenueResponse, error) {
 		"venueId":  venueId,
 		"bookTime": bookTime * 1000, // Convert to milliseconds
 	}
+
+	// 生成动态签名
+	jsSign, err := generateJsSign(payload)
+	if err != nil {
+		return nil, fmt.Errorf("error generating js_sign: %v", err)
+	}
+
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		return nil, fmt.Errorf("error marshalling payload: %v", err)
 	}
+
 	payloadString := string(payloadBytes)
 
 	// Debugging: Print the URL and body
@@ -88,6 +115,7 @@ func QueryVenueData(venueId string, bookTime int64) (*VenueResponse, error) {
 
 	// 设置请求头
 	req.Header = GenerateHeaders()
+	req.Header.Set("js_sign", jsSign) // 使用动态生成的签名
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -102,13 +130,19 @@ func QueryVenueData(venueId string, bookTime int64) (*VenueResponse, error) {
 		return nil, fmt.Errorf("error reading response body: %v", err)
 	}
 
+	// 添加调试输出
+	fmt.Printf("Response Status: %s\n", resp.Status)
+	fmt.Printf("Response Headers: %v\n", resp.Header)
+	fmt.Printf("Response Body: %s\n", string(body))
+
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected HTTP status: %s, response body: %s", resp.Status, string(body))
 	}
 
 	var venueResponse VenueResponse
 	if err := json.Unmarshal(body, &venueResponse); err != nil {
-		return nil, fmt.Errorf("error parsing JSON response: %v", err)
+		// 添加更详细的错误信息
+		return nil, fmt.Errorf("error parsing JSON response: %v\nResponse body: %s", err, string(body))
 	}
 
 	if venueResponse.RtnCode != "10000" {
@@ -120,7 +154,7 @@ func QueryVenueData(venueId string, bookTime int64) (*VenueResponse, error) {
 
 // ExampleUsage demonstrates how to use the module
 func ExampleUsage() {
-	bookTime := time.Date(2024, 11, 20, 0, 0, 0, 0, time.UTC).Unix()
+	bookTime := time.Date(2025, 02, 25, 0, 0, 0, 0, time.UTC).Unix()
 	venueId := "27" // Example: 27 for 9-35号场
 
 	response, err := QueryVenueData(venueId, bookTime)

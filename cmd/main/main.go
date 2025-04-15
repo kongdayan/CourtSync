@@ -2,7 +2,10 @@ package main
 
 import (
 	// alumni "FBS_HKUST_SPIDER/internal/alumni"
-	"FBS_HKUST_SPIDER/internal/jiushi"
+	// "FBS_HKUST_SPIDER/internal/jiushi"
+	"FBS_HKUST_SPIDER/internal/pushdeer"
+	"FBS_HKUST_SPIDER/internal/service"
+	"FBS_HKUST_SPIDER/internal/webui"
 	"fmt"
 	"time"
 )
@@ -40,7 +43,53 @@ func waitUntilTargetTime() {
 }
 
 func main() {
-	jiushi.ExampleUsage()
+	// 启动WebSocket服务器
+	fmt.Println("启动WebSocket服务器...")
+	
+	// PushDeer PushKey 列表
+	pushKeys := []string{
+		"PDU6737T1Qnk6LJpLDpreHNd9JM0voDWIT1cs8SB",
+		"PDU25946T0PBE2qYUzkfE0UPDqtJtjmJEKQMEGgrx",
+		"PDU20193TuD3dWVREr3BgOZJ8y1zvL1XGMCERhN3P",
+	}
+
+	// 创建 PushDeerService
+	pushDeerService := pushdeer.NewPushDeerService(pushKeys)
+	
+	// 启动数据更新服务
+	go func() {
+		// 创建一个定时器，每分钟触发一次
+		ticker := time.NewTicker(1 * time.Minute)
+		defer ticker.Stop()
+
+		// 定时执行数据更新
+		for range ticker.C {
+			// 获取当前时间并检查是否在开放时间段内
+			now := getCurrentTimeInUTC8()
+			hour := now.Hour()
+
+			if hour >= 8 && hour < 22 {
+				fmt.Println("开始执行任务: ", now)
+				unifiedSlots, err := service.UpdateTimeSlots()
+				if err != nil {
+					fmt.Println("数据更新失败:", err)
+				} else {
+					err = pushDeerService.PushTimeSlots(unifiedSlots)
+					if err != nil {
+						fmt.Println("数据推送失败:", err)
+					}
+				}
+			} else {
+				fmt.Println("当前时间不在 8:00 到 22:00 之间，跳过数据更新...")
+			}
+		}
+	}()
+	
+	// 启动WebSocket服务器，使用8080端口
+	webui.StartWebSocketServer("8080")
+
+	// 以下是原有的代码，现在被注释掉
+	// jiushi.ExampleUsage()
 	// PushDeer PushKey 列表
 	// pushKeys := []string{
 	// 	"PDU6737T1Qnk6LJpLDpreHNd9JM0voDWIT1cs8SB",
@@ -88,3 +137,52 @@ func main() {
 	// 	}
 	// }
 }
+	
+	// 以下是原有的代码，现在被注释掉
+	// jiushi.ExampleUsage()
+	// PushDeer PushKey 列表
+	// pushKeys := []string{
+	// 	"PDU6737T1Qnk6LJpLDpreHNd9JM0voDWIT1cs8SB",
+	// 	"PDU25946T0PBE2qYUzkfE0UPDqtJtjmJEKQMEGgrx",
+	// 	"PDU20193TuD3dWVREr3BgOZJ8y1zvL1XGMCERhN3P",
+	// 	// 添加更多 PushKey...
+	// }
+
+	// // 创建 PushDeerService
+	// pushDeerService := pushdeer.NewPushDeerService(pushKeys)
+
+	// // 创建一个 Ticker，每隔 1 分钟触发一次
+	// ticker := time.NewTicker(1 * time.Minute)
+	// defer ticker.Stop()
+
+	// // 无限循环以定期运行任务
+	// for {
+	// 	now := getCurrentTimeInUTC8()
+	// 	hour := now.Hour()
+
+	// 	// 如果当前时间在 8:00 到 22:00 之间，执行任务
+	// 	if hour >= 8 && hour < 22 {
+	// 		fmt.Println("开始执行任务: ", now)
+
+	// 		// 调用 UpdateTimeSlots 函数，获取可用的时间段
+	// 		unifiedSlots, err := service.UpdateTimeSlots()
+	// 		if err != nil {
+	// 			fmt.Println("Error updating timeslots:", err)
+	// 			continue
+	// 		}
+
+	// 		// 调用 PushDeerService 推送结果
+	// 		err = pushDeerService.PushTimeSlots(unifiedSlots)
+	// 		if err != nil {
+	// 			fmt.Println("Error pushing timeslots:", err)
+	// 		}
+
+	// 		// 休眠1分钟后再次检查并执行任务
+	// 		time.Sleep(1 * time.Minute)
+
+	// 	} else {
+	// 		// 如果当前时间晚于 22:00 或早于 8:00，则等待到第二天 8:00
+	// 		fmt.Println("当前时间不在 8:00 到 22:00 之间，进入休眠...")
+	// 		waitUntilTargetTime()
+	// 	}
+	// }

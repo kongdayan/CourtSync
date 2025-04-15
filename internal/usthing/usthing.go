@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 )
 
@@ -62,7 +63,13 @@ type USThingBookingResponse struct {
 
 // GetUSThingAvailableTimeslots 函数用于扫描空闲场地
 func GetAvailableTimeSlots(ustID, userType, facilityID, startDate, endDate string) ([]USThingTimeSlot, error) {
+	// 如果ustID为空，使用默认值
+	if ustID == "" {
+		ustID = "yanag"
+	}
 	url := fmt.Sprintf("https://ms.api.usthing.xyz/v1/fbs/facilityTimeslot?ustID=%s&userType=%s&facilityID=%s&startDate=%s&endDate=%s", ustID, userType, facilityID, startDate, endDate)
+
+	log.Printf("正在请求API: %s", url)
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -79,6 +86,8 @@ func GetAvailableTimeSlots(ustID, userType, facilityID, startDate, endDate strin
 	}
 	defer resp.Body.Close()
 
+	log.Printf("API响应状态码: %d", resp.StatusCode)
+
 	// 读取响应
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -93,16 +102,21 @@ func GetAvailableTimeSlots(ustID, userType, facilityID, startDate, endDate strin
 
 	// 检查响应状态
 	if response.Status != "200" {
-		return nil, fmt.Errorf("unexpected status: %s", response.Status)
+		log.Printf("API返回非200状态: %s, 错误信息: %s", response.Status, response.Message)
+		return nil, fmt.Errorf("unexpected status: %s, message: %s", response.Status, response.Message)
 	}
 
-	// 过滤出所有 timeslotStatus 为 "Reserved" 的时间段
+	log.Printf("成功获取时间段数据，总数: %d", len(response.TimeSlots))
+
+	// 过滤出所有 timeslotStatus 为 "Available" 的时间段
 	availableSlots := []USThingTimeSlot{}
 	for _, slot := range response.TimeSlots {
 		if slot.TimeslotStatus == "Available" {
 			availableSlots = append(availableSlots, slot)
 		}
 	}
+
+	log.Printf("筛选出可用时间段数: %d", len(availableSlots))
 
 	return availableSlots, nil
 }

@@ -1,4 +1,4 @@
-package service
+package pushdeer
 
 import (
 	"FBS_HKUST_SPIDER/internal/service"
@@ -30,14 +30,24 @@ func NewPushDeerService(pushKeys []string) *PushDeerService {
 
 // PushTimeSlots 将时间段信息推送到 PushDeer
 func (p *PushDeerService) PushTimeSlots(timeslots []service.UnifiedTimeSlot) error {
+	// 检查是否有可用场地
+	if len(timeslots) == 0 {
+		fmt.Println("没有可用场地，跳过推送")
+		return nil
+	}
+
 	// 将 UnifiedTimeSlot 列表转换为字符串
 	timeslotText := p.ConvertSlotsToText(timeslots)
+	fmt.Printf("准备推送 %d 条时间段数据\n", len(timeslots))
 
 	// 遍历每一个 PushKey 并发送推送
 	for _, key := range p.PushKeys {
+		fmt.Printf("正在向PushKey %s 发送推送...\n", key)
 		err := p.sendPush(key, timeslotText)
 		if err != nil {
-			fmt.Printf("Error sending push for key %s: %v\n", key, err)
+			fmt.Printf("向PushKey %s 发送推送失败: %v\n", key, err)
+		} else {
+			fmt.Printf("向PushKey %s 发送推送成功\n", key)
 		}
 	}
 

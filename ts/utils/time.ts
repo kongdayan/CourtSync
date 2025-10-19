@@ -30,3 +30,11 @@ export function getNextWeekSameDay(now: Date = new Date()): string {
 export function getTodayUTC8(now: Date = new Date()): string {
   return formatAsDateUTC8(now);
 }
+
+export function getDateDaysAhead(
+  days: number,
+  now: Date = new Date()
+): string {
+  const target = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+  return formatAsDateUTC8(target);
+}

@@ -5,7 +5,7 @@ import {
   PushDeerConfig,
   USThingConfig,
 } from "./types";
-import { getTodayUTC8, getNextWeekSameDay } from "./utils/time";
+import { getTodayUTC8, getDateDaysAhead } from "./utils/time";
 import { renderSlotsTable } from "./views/table";
 
 export interface WorkerEnv {
@@ -58,7 +58,7 @@ export async function runTimeslotSync(
 ): Promise<UnifiedTimeSlot[]> {
   const usthingConfig = parseUSThingConfig(env);
   const startDate = getTodayUTC8();
-  const endDate = getNextWeekSameDay();
+  const endDate = getDateDaysAhead(14);
 
   console.log(
     `[USThing] Starting sync for facilities ${usthingConfig.facilityIDs.join(
@@ -116,10 +116,20 @@ export default {
     const format = url.searchParams.get("format");
     const accept = request.headers.get("Accept") ?? "";
     const wantsHtml = format === "html" || accept.includes("text/html");
+    const pageParam = Number.parseInt(url.searchParams.get("page") ?? "0", 10);
+    const page = Number.isFinite(pageParam) ? Math.max(0, pageParam) : 0;
 
     if (wantsHtml) {
+      const baseParams = new URLSearchParams(url.searchParams);
+      baseParams.set("format", "html");
+      baseParams.delete("page");
+      const baseQuery = baseParams.toString();
       const html = renderSlotsTable(slots, {
         generatedAt: new Date(),
+        page,
+        pageSize: 8,
+        basePath: url.pathname,
+        baseQuery,
       });
       return new Response(html, {
         headers: { "Content-Type": "text/html; charset=utf-8" },

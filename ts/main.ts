@@ -6,6 +6,7 @@ import {
   USThingConfig,
 } from "./types";
 import { getTodayUTC8, getNextWeekSameDay } from "./utils/time";
+import { renderSlotsTable } from "./views/table";
 
 export interface WorkerEnv {
   PUSHDEER_KEYS?: string;
@@ -111,6 +112,20 @@ export default {
     }
 
     const slots = await runTimeslotSync(env);
+    const url = new URL(request.url);
+    const format = url.searchParams.get("format");
+    const accept = request.headers.get("Accept") ?? "";
+    const wantsHtml = format === "html" || accept.includes("text/html");
+
+    if (wantsHtml) {
+      const html = renderSlotsTable(slots, {
+        generatedAt: new Date(),
+      });
+      return new Response(html, {
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      });
+    }
+
     const body = JSON.stringify({ count: slots.length, slots }, null, 2);
     return new Response(body, {
       headers: { "Content-Type": "application/json" },

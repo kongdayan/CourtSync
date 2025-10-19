@@ -1,19 +1,11 @@
 import { UnifiedTimeSlot } from "../types";
-
-const facilityMap: Record<string, string> = {
-  "2": "LG1C1",
-  "3": "LG1C2",
-  "4": "LG1C3",
-  "5": "LG1C4",
-  "79": "LG1-C5",
-  "80": "LG1-C6",
-};
+import { resolveFacilityName } from "../constants/facilities";
 
 function formatSlots(slots: UnifiedTimeSlot[]): string {
   const parts: string[] = [];
 
   for (const slot of slots) {
-    const facilityName = facilityMap[slot.FacilityID] ?? slot.FacilityID;
+    const facilityName = resolveFacilityName(slot.FacilityID);
     parts.push(
       `${slot.Date.slice(5, 7)}月${slot.Date.slice(8)}日${slot.StartTime.slice(
         0,

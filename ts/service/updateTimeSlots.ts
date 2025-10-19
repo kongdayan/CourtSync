@@ -69,12 +69,30 @@ interface USThingOptions {
   startDate: string;
   endDate: string;
   bearer?: string;
+  warnings?: string[];
 }
 
 export async function updateUSThingTimeSlots(
   options: USThingOptions
 ): Promise<UnifiedTimeSlot[]> {
-  const { facilityIDs = ["2", "3", "4", "5"], fetchImpl = fetch, bearer } = options;
+  const {
+    facilityIDs = ["2", "3", "4", "5"],
+    fetchImpl = fetch,
+    bearer,
+    warnings,
+  } = options;
+
+  const addWarning = (message: string) => {
+    if (!warnings) {
+      return;
+    }
+    if (!warnings.includes(message)) {
+      warnings.push(message);
+    }
+  };
+
+  const jwtWarning =
+    "USThing authorization token appears to be invalid or expired. Please contact the administrator to refresh the bearer JWT.";
 
   console.log(
     `[USThing] Fetching slots for facilities ${facilityIDs.join(
@@ -100,6 +118,19 @@ export async function updateUSThingTimeSlots(
           return facilitySlots;
         })
         .catch((error) => {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          const normalized = message.toLowerCase();
+          if (
+            normalized.includes("jwt") ||
+            normalized.includes("unauthor") ||
+            normalized.includes("401")
+          ) {
+            addWarning(jwtWarning);
+          }
+          addWarning(
+            `Failed to fetch USThing slots for facility ${facilityId}: ${message}`
+          );
           console.error(
             `Failed to fetch USThing slots for facility ${facilityId}:`,
             error

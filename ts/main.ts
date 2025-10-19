@@ -55,10 +55,11 @@ function parseUSThingConfig(env?: WorkerEnv): USThingConfig {
 export async function runTimeslotSync(
   env?: WorkerEnv,
   fetchImpl: typeof fetch = fetch
-): Promise<UnifiedTimeSlot[]> {
+): Promise<{ slots: UnifiedTimeSlot[]; warnings: string[] }> {
   const usthingConfig = parseUSThingConfig(env);
   const startDate = getTodayUTC8();
   const endDate = getDateDaysAhead(14);
+  const warnings: string[] = [];
 
   console.log(
     `[USThing] Starting sync for facilities ${usthingConfig.facilityIDs.join(
@@ -76,9 +77,18 @@ export async function runTimeslotSync(
     endDate,
     bearer: usthingConfig.bearer,
     fetchImpl,
+    warnings,
   });
 
   const pushConfig = parsePushConfig(env);
+
+  if (!slots.length) {
+    const jwtWarning =
+      "USThing authorization token appears to be invalid or expired. Please contact the administrator to refresh the bearer JWT.";
+    if (!warnings.some((w) => w.toLowerCase().includes("jwt"))) {
+      warnings.push(jwtWarning);
+    }
+  }
 
   if (pushConfig && slots.length > 0) {
     console.log(
@@ -98,7 +108,7 @@ export async function runTimeslotSync(
     console.warn("[USThing] No slots returned in this sync");
   }
 
-  return slots;
+  return { slots, warnings };
 }
 
 export default {
@@ -111,7 +121,7 @@ export default {
       return new Response("Method Not Allowed", { status: 405 });
     }
 
-    const slots = await runTimeslotSync(env);
+    const { slots, warnings } = await runTimeslotSync(env);
     const url = new URL(request.url);
     const format = url.searchParams.get("format");
     const accept = request.headers.get("Accept") ?? "";
@@ -130,13 +140,18 @@ export default {
         pageSize: 8,
         basePath: url.pathname,
         baseQuery,
+        warnings,
       });
       return new Response(html, {
         headers: { "Content-Type": "text/html; charset=utf-8" },
       });
     }
 
-    const body = JSON.stringify({ count: slots.length, slots }, null, 2);
+    const body = JSON.stringify(
+      { count: slots.length, slots, warnings },
+      null,
+      2
+    );
     return new Response(body, {
       headers: { "Content-Type": "application/json" },
     });
@@ -147,6 +162,6 @@ export default {
     env: WorkerEnv,
     ctx: ExecutionContext
   ): Promise<void> {
-    ctx.waitUntil(runTimeslotSync(env));
+    ctx.waitUntil(runTimeslotSync(env).then(() => undefined));
   },
 };

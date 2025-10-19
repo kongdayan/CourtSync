@@ -12,6 +12,7 @@ interface RenderOptions {
   pageSize?: number;
   basePath?: string;
   baseQuery?: string;
+  warnings?: string[];
 }
 
 function statusColor(status: string): string {
@@ -86,6 +87,10 @@ export function renderSlotsTable(
     return `${basePath}${qs ? `?${qs}` : ""}`;
   };
 
+  const warnings = options.warnings ?? [];
+  const tokenWarning = warnings.find((w) =>
+    w.toLowerCase().includes("jwt")
+  );
   const generated = options.generatedAt.toLocaleString("en-US", {
     hour12: false,
     timeZone: "Asia/Shanghai",
@@ -168,9 +173,12 @@ export function renderSlotsTable(
   </head>
   <body class="bg-slate-100 text-gray-900 transition-colors duration-300 dark:bg-slate-900 dark:text-slate-100">
     <div class="max-w-7xl mx-auto px-4 py-6 space-y-5">
-      <section class="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700">
-        <div class="flex items-center gap-3">
-          <h2 class="text-base font-semibold text-slate-800 dark:text-slate-100">Follow for updates</h2>
+      <section class="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 class="text-2xl font-bold text-slate-900 dark:text-slate-100">📊 USThing Timeslot Dashboard</h1>
+            <p class="text-sm text-slate-600 dark:text-slate-300">Live snapshot grouped by date and timeslot</p>
+          </div>
           <label class="theme-toggle text-xs text-slate-600 dark:text-slate-300">
             <input id="theme-toggle" type="checkbox" />
             <span class="toggle-track">
@@ -182,7 +190,27 @@ export function renderSlotsTable(
             </span>
           </label>
         </div>
-        <div class="flex flex-wrap items-center gap-3 text-sm">
+        <div class="mt-4 grid gap-2 text-sm text-slate-600 dark:text-slate-300 sm:grid-cols-2">
+          <p>⏱ Generated (UTC+8): <span class="font-medium text-slate-900 dark:text-slate-100">${generated}</span></p>
+          <p>🧮 Total slots collected: <span class="font-medium text-slate-900 dark:text-slate-100">${slots.length}</span></p>
+        </div>
+      </section>
+
+      ${
+        tokenWarning
+          ? `<section class="rounded-lg border border-amber-300 bg-amber-50/80 p-4 text-sm text-amber-800 shadow-sm dark:border-amber-500 dark:bg-amber-900/30 dark:text-amber-200">
+              <h2 class="text-base font-semibold">⚠️ JWT token maintenance required</h2>
+              <p class="mt-1">
+                The latest API response indicates the USThing bearer JWT has expired. Please refresh the authorization token in your Worker configuration to restore data fetching.
+              </p>
+            </section>`
+          : ""
+      }
+
+      <section class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+        <h2 class="text-base font-semibold text-slate-800 dark:text-slate-100">🤝 Connect with me</h2>
+        <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">Curious about what I am building next? Follow along for behind-the-scenes updates and side projects.</p>
+        <div class="mt-3 flex flex-wrap items-center gap-3 text-sm">
           <a class="flex items-center gap-1 rounded-full border border-slate-200 px-3 py-1 text-sky-600 transition hover:border-sky-400 hover:bg-sky-50 dark:border-slate-600 dark:text-sky-400 dark:hover:bg-slate-700" href="https://x.com/Kook91513056" target="_blank" rel="noopener noreferrer">
             <img alt="Twitter" src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/x.svg" class="h-4 w-4" />
             <span>@Kook91513056</span>
@@ -193,17 +221,6 @@ export function renderSlotsTable(
           </a>
         </div>
       </section>
-
-      <header class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between text-slate-900 dark:text-slate-100">
-        <div>
-          <h1 class="text-2xl font-bold">USThing Timeslot Dashboard</h1>
-          <p class="text-sm text-slate-600 dark:text-slate-300">Live snapshot grouped by date and timeslot</p>
-        </div>
-        <div class="text-sm text-slate-600 dark:text-slate-300">
-          <p>Generated (UTC+8): <span class="font-medium text-slate-900 dark:text-slate-100">${generated}</span></p>
-          <p>Total slots: <span class="font-medium text-slate-900 dark:text-slate-100">${slots.length}</span></p>
-        </div>
-      </header>
 
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3 text-slate-600 dark:text-slate-300">
         <div>
@@ -362,6 +379,13 @@ export function renderSlotsTable(
       <footer class="mt-6 space-y-3 text-xs text-slate-500">
         <p>Status legend: <span class="inline-block h-3 w-3 rounded bg-green-500 align-middle"></span> Available · <span class="inline-block h-3 w-3 rounded bg-gray-400 align-middle"></span> Reserved · <span class="inline-block h-3 w-3 rounded bg-yellow-400 align-middle"></span> Maintenance / Cleaning · other states appear in light gray.</p>
       </footer>
+
+      <aside class="rounded-lg border border-dashed border-indigo-300 bg-indigo-50/70 p-4 text-sm text-indigo-700 shadow-sm dark:border-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-200">
+        <h3 class="mb-1 text-base font-semibold">🚧 Real-time alerts coming soon</h3>
+        <p>
+          Working on push notifications for instant timeslot updates. Stay tuned for the upcoming release if you'd like to receive live alerts when new slots open up.
+        </p>
+      </aside>
     </div>
     <script>
       (function () {

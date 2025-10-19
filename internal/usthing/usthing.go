@@ -124,7 +124,7 @@ func GetAvailableTimeSlots(ustID, userType, facilityID, startDate, endDate strin
 // USThingBooking 函数，负责发送 HTTP POST 请求，预定场地并返回解析后的响应
 func Booking(ustID, userType, facilityID, timeslotDate, startTime, endTime, cancelInd string) (*USThingBookingResponse, error) {
 	// API URL
-	url := fmt.Sprintf("https://ms.api.usthing.xyz/v1/fbs/book?ustID=%s&userType=%s&facilityID=%s&timeslotDate=%s&startTime=%s&endTime=%s&cancelInd=%s", ustID, userType, facilityID, timeslotDate, startTime, endTime, cancelInd)
+	url := fmt.Sprintf("https://ms.api.usthing.xyz/v2/fbs/book?ustID=%s&userType=%s&facilityID=%s&timeslotDate=%s&startTime=%s&endTime=%s&cancelInd=%s", ustID, userType, facilityID, timeslotDate, startTime, endTime, cancelInd)
 
 	// 创建一个新的 HTTP POST 请求
 	req, err := http.NewRequest("POST", url, nil)

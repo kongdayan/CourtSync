@@ -7,7 +7,7 @@ const BASE_HEADERS: HeaderMap = {
   "Content-Length": "0",
   Connection: "keep-alive",
   Cookie: "language=en-US",
-  "User-Agent": "USThing/113 CFNetwork/1568.100.1 Darwin/24.0.0",
+  "User-Agent": "USThing/428 CFNetwork/3860.100.1 Darwin/25.0.0",
 };
 
 function buildHeaders(bearer?: string): HeaderMap {

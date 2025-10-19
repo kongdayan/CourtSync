@@ -152,6 +152,18 @@ export function renderSlotsTable(
       input:checked + .toggle-track .toggle-thumb {
         transform: translateX(1.3rem);
       }
+      .mobile-grid {
+        display: none;
+      }
+      @media (max-width: 768px) {
+        .desktop-table {
+          display: none;
+        }
+        .mobile-grid {
+          display: grid;
+          gap: 1rem;
+        }
+      }
     </style>
   </head>
   <body class="bg-slate-100 text-gray-900 transition-colors duration-300 dark:bg-slate-900 dark:text-slate-100">
@@ -224,7 +236,7 @@ export function renderSlotsTable(
         }
       </div>
 
-      <div class="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+      <div class="desktop-table overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
         <table class="min-w-full table-fixed divide-y divide-slate-200 text-sm dark:divide-slate-700">
           <thead class="bg-slate-50 dark:bg-slate-700">
             <tr>
@@ -293,7 +305,61 @@ export function renderSlotsTable(
         </table>
       </div>
 
-      <footer class="space-y-3 text-xs text-slate-500">
+      <div class="mobile-grid">
+        ${
+          datesToDisplay
+            .map((date) => {
+              const dateSlots = timeLabels.map(({ start, label }) => {
+                const cells = slotsByDateTime.get(`${date}|${start}`) ?? [];
+                return {
+                  label,
+                  slots: cells,
+                };
+              });
+
+              return `<section class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                <header class="mb-3">
+                  <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-100">${date}</h3>
+                </header>
+                <div class="space-y-2">
+                  ${dateSlots
+                    .map(({ label, slots }) => {
+                      if (!slots.length) {
+                        return `<div class="flex items-center justify-between rounded-md border border-dashed border-slate-200 px-3 py-2 text-xs text-slate-400 dark:border-slate-600 dark:text-slate-500">
+                          <span class="font-mono">${label}</span>
+                          <span>-</span>
+                        </div>`;
+                      }
+                      const badges = slots
+                        .map((slot) => {
+                          const colorClass = statusColor(slot.Status);
+                          const facilityName = resolveFacilityName(slot.FacilityID);
+                          const activity = slot.ActivityName?.trim() ?? "";
+                          const classLabel =
+                            activity.toLowerCase().includes("class")
+                              ? `<span class="ml-1 rounded bg-black/30 px-1.5 text-[0.55rem] font-medium uppercase tracking-wide text-white">Class</span>`
+                              : "";
+                          return `<span class="inline-flex items-center rounded-md px-2 py-1 text-xs ${colorClass} dark:opacity-90">
+                            <span>${facilityName}</span>
+                            ${classLabel}
+                          </span>`;
+                        })
+                        .join(" ");
+
+                      return `<div class="rounded-md border border-slate-200 px-3 py-2 text-xs dark:border-slate-600">
+                        <div class="mb-1 font-mono text-slate-600 dark:text-slate-300">${label}</div>
+                        <div class="flex flex-wrap gap-1">${badges}</div>
+                      </div>`;
+                    })
+                    .join("")}
+                </div>
+              </section>`;
+            })
+            .join("")
+        }
+      </div>
+
+      <footer class="mt-6 space-y-3 text-xs text-slate-500">
         <p>Status legend: <span class="inline-block h-3 w-3 rounded bg-green-500 align-middle"></span> Available · <span class="inline-block h-3 w-3 rounded bg-gray-400 align-middle"></span> Reserved · <span class="inline-block h-3 w-3 rounded bg-yellow-400 align-middle"></span> Maintenance / Cleaning · other states appear in light gray.</p>
       </footer>
     </div>

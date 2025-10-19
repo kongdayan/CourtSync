@@ -1,2 +1,16 @@
 res
 .idea
+# macOS
+.DS_Store
+
+# Editor metadata
+.idea/
+
+# Node / Wrangler artifacts
+node_modules/
+.wrangler/
+.wrangler-logs/
+.npm/
+
+# Local environment overrides
+.dev.vars

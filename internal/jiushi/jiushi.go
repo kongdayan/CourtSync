@@ -154,7 +154,9 @@ func QueryVenueData(venueId string, bookTime int64) (*VenueResponse, error) {
 
 // ExampleUsage demonstrates how to use the module
 func ExampleUsage() {
-	bookTime := time.Date(2025, 02, 25, 0, 0, 0, 0, time.UTC).Unix()
+	tomorrow := time.Now().AddDate(0, 0, 1)
+	tomorrowMidnight := time.Date(tomorrow.Year(), tomorrow.Month(), tomorrow.Day(), 0, 0, 0, 0, time.UTC).Unix()
+	bookTime := tomorrowMidnight
 	venueId := "27" // Example: 27 for 9-35号场
 
 	response, err := QueryVenueData(venueId, bookTime)

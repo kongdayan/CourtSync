@@ -91,9 +91,7 @@ export async function getAvailableTimeSlots(
     throw new Error(`Unexpected status: ${data.status}`);
   }
 
-  return (data.timeslot ?? []).filter(
-    (slot) => slot.timeslotStatus === "Available"
-  );
+  return data.timeslot ?? [];
 }
 
 export async function booking(

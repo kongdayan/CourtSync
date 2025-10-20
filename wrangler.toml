@@ -30,3 +30,5 @@ USTHING_USER_TYPE = "01"
 # Optional: USTHING_FACILITY_IDS = "2,3,4,5,79,80,100,101"
 # Optional: configure inline bearer during local dev
 # USTHING_BEARER = "Bearer your-jwt-token"
+# Optional: gate /admin/token updates
+# TOKEN_ADMIN_SECRET = "change-me"

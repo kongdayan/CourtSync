@@ -36,6 +36,7 @@ npx wrangler dev --test-scheduled
 | `USTHING_USER_TYPE` | Optional. Default `01`. |
 | `USTHING_FACILITY_IDS` | Comma-separated facility IDs (defaults to `2,3,4,5,79,80,100,101`). |
 | `PUSHDEER_KEYS` | Optional. Comma-separated PushDeer keys. |
+| `TOKEN_ADMIN_SECRET` | Optional. Passphrase required when updating the bearer token via `/admin/token`. |
 
 During local dev you can use `.dev.vars` or export variables before `wrangler dev`. For production, write secrets to the KV namespace:
 
@@ -94,6 +95,16 @@ jobs:
 
 Create a Cloudflare API token with *Edit Workers* permissions and add it plus your account ID as repo secrets (`CF_API_TOKEN`, `CF_ACCOUNT_ID`).
 
+## Managing the Bearer Token
+
+You can refresh the JWT without touching Wrangler by visiting `/admin/token` on the worker (e.g. `https://fbs-hkust-spider.example.workers.dev/admin/token`). Provide the `TOKEN_ADMIN_SECRET` value and the full `Bearer ...` string; the worker writes it into the KV key `usthing:bearer`. For CLI/automation, the same update is available via:
+
+```bash
+npx wrangler kv:key put --binding=hkust_token usthing:bearer "Bearer <jwt>"
+```
+
+Remember to repeat the command with `--preview` (and optionally `--local`) when updating preview/local environments.
+
 ## Legacy Go Scanner (Optional)
 
 The original Go-based workflow is still available:
@@ -107,6 +118,5 @@ It shares service logic with the worker and can be extended for CLI automation o
 ## License
 
 MIT © kongdayan
-
 
 

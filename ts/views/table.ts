@@ -1,5 +1,8 @@
 import { UnifiedTimeSlot } from "../types";
-import { resolveFacilityName } from "../constants/facilities";
+import {
+  resolveFacilityName,
+  listKnownFacilities,
+} from "../constants/facilities";
 
 const DEFAULT_TIME_GRID = Array.from({ length: 15 }, (_, i) => {
   const hour = i + 8;
@@ -13,6 +16,17 @@ interface RenderOptions {
   basePath?: string;
   baseQuery?: string;
   warnings?: string[];
+}
+
+const FACILITY_ORDER = listKnownFacilities().map(([id]) => id);
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function statusColor(status: string): string {
@@ -110,24 +124,106 @@ export function renderSlotsTable(
       * { box-sizing: border-box; }
       .slot-cell {
         display: grid;
-        gap: 0.25rem;
+        gap: 0.45rem;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-rows: repeat(2, minmax(0, 1fr));
       }
       .slot-badge {
-        font-size: 0.7rem;
-        line-height: 0.95rem;
+        position: relative;
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+        text-align: center;
+        font-size: 0.52rem;
+        line-height: 0.68rem;
+        min-height: 1.05rem;
+        border-radius: 0.4rem;
+        padding: 0.1rem 0.22rem;
+        border: 4px solid transparent;
+      }
+      .slot-badge .slot-label {
+        font-size: 0.55rem;
+      }
+      .slot-badge.is-class {
+        border-color: rgba(30, 41, 59, 0.85);
+      }
+      .dark .slot-badge.is-class {
+        border-color: rgba(226, 232, 240, 0.85);
+      }
+      .slot-badge[data-activity]::after,
+      .slot-badge[data-activity]::before {
+        position: absolute;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.05s ease;
+        z-index: 20;
+      }
+      .slot-badge[data-activity]::after {
+        content: attr(data-activity);
+        bottom: calc(100% + 0.35rem);
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(15, 23, 42, 0.92);
+        color: #fff;
+        padding: 0.25rem 0.35rem;
+        border-radius: 0.35rem;
+        font-size: 0.6rem;
+        line-height: 0.75rem;
+        max-width: 14rem;
+        white-space: normal;
+        text-align: center;
+        box-shadow: 0 6px 16px rgba(15, 23, 42, 0.35);
+      }
+      .dark .slot-badge[data-activity]::after {
+        background: rgba(226, 232, 240, 0.95);
+        color: rgba(15, 23, 42, 0.9);
+      }
+      .slot-badge[data-activity]::before {
+        content: "";
+        bottom: calc(100% + 0.1rem);
+        left: 50%;
+        transform: translateX(-50%);
+        border-width: 0.35rem;
+        border-style: solid;
+        border-color: rgba(15, 23, 42, 0.92) transparent transparent transparent;
+      }
+      .dark .slot-badge[data-activity]::before {
+        border-color: rgba(226, 232, 240, 0.95) transparent transparent transparent;
+      }
+      .slot-badge[data-activity]:hover::after,
+      .slot-badge[data-activity]:hover::before,
+      .slot-badge[data-activity]:focus-visible::after,
+      .slot-badge[data-activity]:focus-visible::before {
+        opacity: 1;
+      }
+      .slot-empty {
+        background: rgba(148, 163, 184, 0.35);
+        color: rgb(100, 116, 139);
+      }
+      .dark .slot-empty {
+        background: rgba(148, 163, 184, 0.18);
+        color: rgb(148, 163, 184);
       }
       @media (min-width: 768px) {
         td[data-slot-cell] {
-          width: 10rem;
+          width: 12.5rem;
         }
       }
-      .theme-toggle {
+      th.time-col {
+        width: 7rem;
+        min-width: 7rem;
+        max-width: 7rem;
+      }
+      .theme-toggle,
+      .compact-toggle {
         display: inline-flex;
         align-items: center;
         gap: 0.5rem;
         cursor: pointer;
       }
-      .theme-toggle input {
+      .theme-toggle input,
+      .compact-toggle input {
         position: absolute;
         opacity: 0;
         pointer-events: none;
@@ -169,26 +265,56 @@ export function renderSlotsTable(
           gap: 1rem;
         }
       }
+      /* Compact view overrides */
+      .compact-mode td[data-slot-cell] {
+        width: 6rem;
+        padding: 0.12rem;
+      }
+      .compact-mode .slot-cell {
+        gap: 0.12rem;
+      }
+      .compact-mode .slot-badge {
+        font-size: 0.48rem;
+        line-height: 0.55rem;
+        min-height: 0.8rem;
+        padding: 0.08rem 0.12rem;
+        border-radius: 0.3rem;
+      }
+      .compact-mode .slot-badge .slot-label {
+        display: none;
+      }
     </style>
   </head>
   <body class="bg-slate-100 text-gray-900 transition-colors duration-300 dark:bg-slate-900 dark:text-slate-100">
-    <div class="max-w-7xl mx-auto px-4 py-6 space-y-5">
-      <section class="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700">
+    <div class="max-w-8xl mx-auto px-6 py-6 space-y-5">
+      <section class="rounded-lg bg-white p-6 shadow-sm ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 class="text-2xl font-bold text-slate-900 dark:text-slate-100">📊 USThing Timeslot Dashboard</h1>
             <p class="text-sm text-slate-600 dark:text-slate-300">Live snapshot grouped by date and timeslot</p>
           </div>
-          <label class="theme-toggle text-xs text-slate-600 dark:text-slate-300">
-            <input id="theme-toggle" type="checkbox" />
-            <span class="toggle-track">
-              <span class="toggle-thumb"></span>
-            </span>
-            <span class="toggle-label">
-              <span class="toggle-label-dark">Dark</span>
-              <span class="toggle-label-light hidden">Light</span>
-            </span>
-          </label>
+          <div class="flex items-center gap-3 text-xs text-slate-600 dark:text-slate-300">
+            <label class="compact-toggle">
+              <input id="compact-toggle" type="checkbox" />
+              <span class="toggle-track">
+                <span class="toggle-thumb"></span>
+              </span>
+              <span class="toggle-label">
+                <span class="toggle-label-dark">Detailed</span>
+                <span class="toggle-label-light hidden">Compact</span>
+              </span>
+            </label>
+            <label class="theme-toggle">
+              <input id="theme-toggle" type="checkbox" />
+              <span class="toggle-track">
+                <span class="toggle-thumb"></span>
+              </span>
+              <span class="toggle-label">
+                <span class="toggle-label-dark">Dark</span>
+                <span class="toggle-label-light hidden">Light</span>
+              </span>
+            </label>
+          </div>
         </div>
         <div class="mt-4 grid gap-2 text-sm text-slate-600 dark:text-slate-300 sm:grid-cols-2">
           <p>⏱ Generated (UTC+8): <span class="font-medium text-slate-900 dark:text-slate-100">${generated}</span></p>
@@ -257,7 +383,7 @@ export function renderSlotsTable(
         <table class="min-w-full table-fixed divide-y divide-slate-200 text-sm dark:divide-slate-700">
           <thead class="bg-slate-50 dark:bg-slate-700">
             <tr>
-              <th class="sticky left-0 bg-slate-50 px-3 py-2 text-left font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-100">Time</th>
+              <th class="time-col sticky left-0 bg-slate-50 px-3 py-2 text-left font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-100">Time</th>
               ${datesToDisplay
                 .map(
                   (date) =>
@@ -275,25 +401,23 @@ export function renderSlotsTable(
                         .map((date) => {
                           const key = `${date}|${start}`;
                           const entries = slotsByDateTime.get(key) ?? [];
-                          if (!entries.length) {
-                            return `<td class="px-3 py-2 text-center text-slate-300 dark:text-slate-500">-</td>`;
-                          }
+                          const entryMap = new Map(entries.map((slot) => [slot.FacilityID, slot]));
 
-                          const badges = entries
-                            .map((slot) => {
-                              const colorClass = statusColor(slot.Status);
-                              const facilityName = resolveFacilityName(slot.FacilityID);
-                              const activity = slot.ActivityName?.trim() ?? "";
-                              const classLabel =
-                                activity.toLowerCase().includes("class")
-                                  ? `<span class="ml-1 rounded bg-black/30 px-1.5 text-[0.55rem] font-medium uppercase tracking-wide text-white">Class</span>`
-                                  : "";
-                              return `<span class="slot-badge flex items-center rounded-md px-2 py-1 ${colorClass} dark:opacity-90">
-                                <span>${facilityName}</span>
-                                ${classLabel}
-                              </span>`;
-                            })
-                            .join("");
+                          const badges = FACILITY_ORDER.map((facilityId) => {
+                            const slot = entryMap.get(facilityId);
+                            if (!slot) {
+                              return `<span class="slot-badge slot-empty"><span class="slot-label">${resolveFacilityName(facilityId)}</span></span>`;
+                            }
+                            const colorClass = statusColor(slot.Status);
+                            const facilityName = resolveFacilityName(slot.FacilityID);
+                            const activity = slot.ActivityName?.trim() ?? "";
+                            const isClass = activity.toLowerCase().includes("class");
+                            const extraClass = isClass ? " is-class" : "";
+                            const tooltipAttr = activity.length ? ` data-activity="${escapeHtml(activity)}"` : "";
+                            return `<span class="slot-badge${extraClass} flex items-center rounded-md px-2 py-1 ${colorClass} dark:opacity-90"${tooltipAttr}>
+                              <span class="slot-label">${facilityName}</span>
+                            </span>`;
+                          }).join("");
 
                           return `<td class="px-3 py-2" data-slot-cell>
                             <div class="slot-cell">${badges}</div>
@@ -302,7 +426,7 @@ export function renderSlotsTable(
                         .join("");
 
                       return `<tr class="text-slate-700 dark:text-slate-200">
-                        <th class="sticky left-0 bg-slate-50 px-3 py-2 text-left font-medium text-slate-700 font-mono dark:bg-slate-700 dark:text-slate-100">${label}</th>
+                        <th class="time-col sticky left-0 bg-slate-50 px-3 py-2 text-left font-medium text-slate-700 font-mono dark:bg-slate-700 dark:text-slate-100">${label}</th>
                         ${rowCells}
                       </tr>`;
                     })
@@ -330,7 +454,7 @@ export function renderSlotsTable(
                 const cells = slotsByDateTime.get(`${date}|${start}`) ?? [];
                 return {
                   label,
-                  slots: cells,
+                  slots: new Map(cells.map((slot) => [slot.FacilityID, slot])),
                 };
               });
 
@@ -341,31 +465,25 @@ export function renderSlotsTable(
                 <div class="space-y-2">
                   ${dateSlots
                     .map(({ label, slots }) => {
-                      if (!slots.length) {
-                        return `<div class="flex items-center justify-between rounded-md border border-dashed border-slate-200 px-3 py-2 text-xs text-slate-400 dark:border-slate-600 dark:text-slate-500">
-                          <span class="font-mono">${label}</span>
-                          <span>-</span>
-                        </div>`;
-                      }
-                      const badges = slots
-                        .map((slot) => {
-                          const colorClass = statusColor(slot.Status);
-                          const facilityName = resolveFacilityName(slot.FacilityID);
-                          const activity = slot.ActivityName?.trim() ?? "";
-                          const classLabel =
-                            activity.toLowerCase().includes("class")
-                              ? `<span class="ml-1 rounded bg-black/30 px-1.5 text-[0.55rem] font-medium uppercase tracking-wide text-white">Class</span>`
-                              : "";
-                          return `<span class="inline-flex items-center rounded-md px-2 py-1 text-xs ${colorClass} dark:opacity-90">
-                            <span>${facilityName}</span>
-                            ${classLabel}
-                          </span>`;
-                        })
-                        .join(" ");
+                      const badges = FACILITY_ORDER.map((facilityId) => {
+                        const slot = slots.get(facilityId);
+                        if (!slot) {
+                          return `<span class="slot-badge slot-empty"><span class="slot-label">${resolveFacilityName(facilityId)}</span></span>`;
+                        }
+                        const colorClass = statusColor(slot.Status);
+                        const facilityName = resolveFacilityName(slot.FacilityID);
+                        const activity = slot.ActivityName?.trim() ?? "";
+                        const isClass = activity.toLowerCase().includes("class");
+                        const extraClass = isClass ? " is-class" : "";
+                        const tooltipAttr = activity.length ? ` data-activity="${escapeHtml(activity)}"` : "";
+                        return `<span class="slot-badge${extraClass} flex items-center rounded-md px-2 py-1 text-xs ${colorClass} dark:opacity-90"${tooltipAttr}>
+                          <span class="slot-label">${facilityName}</span>
+                        </span>`;
+                      }).join(" ");
 
                       return `<div class="rounded-md border border-slate-200 px-3 py-2 text-xs dark:border-slate-600">
                         <div class="mb-1 font-mono text-slate-600 dark:text-slate-300">${label}</div>
-                        <div class="flex flex-wrap gap-1">${badges}</div>
+                        <div class="slot-cell">${badges}</div>
                       </div>`;
                     })
                     .join("")}
@@ -389,42 +507,69 @@ export function renderSlotsTable(
     </div>
     <script>
       (function () {
-        const toggleInput = document.getElementById("theme-toggle");
-        if (!(toggleInput instanceof HTMLInputElement)) return;
-        const darkLabel = document.querySelector(".toggle-label-dark");
-        const lightLabel = document.querySelector(".toggle-label-light");
+        const themeToggle = document.getElementById("theme-toggle");
+        const compactToggle = document.getElementById("compact-toggle");
+        if (!(themeToggle instanceof HTMLInputElement) || !(compactToggle instanceof HTMLInputElement)) return;
+        const themeDarkLabel = document.querySelector(".theme-toggle .toggle-label-dark");
+        const themeLightLabel = document.querySelector(".theme-toggle .toggle-label-light");
+        const compactDarkLabel = document.querySelector(".compact-toggle .toggle-label-dark");
+        const compactLightLabel = document.querySelector(".compact-toggle .toggle-label-light");
         const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-        const stored = localStorage.getItem("usthing-theme");
+        const storedTheme = localStorage.getItem("usthing-theme");
+        const storedCompact = localStorage.getItem("usthing-compact");
         const hour = ${options.generatedAt.getHours()};
         const timeBasedDefault = hour >= 19 || hour < 7 ? "dark" : "light";
 
-        function apply(theme, syncInput = true) {
+        function applyTheme(theme, syncInput = true) {
           const root = document.documentElement;
           const body = document.body;
           if (theme === "dark") {
             root.classList.add("dark");
             body.classList.add("bg-slate-900", "text-slate-100");
             body.classList.remove("bg-slate-100", "text-gray-900");
-            darkLabel?.classList.add("hidden");
-            lightLabel?.classList.remove("hidden");
-            if (syncInput) toggleInput.checked = true;
+            themeDarkLabel?.classList.add("hidden");
+            themeLightLabel?.classList.remove("hidden");
+            if (syncInput) themeToggle.checked = true;
           } else {
             root.classList.remove("dark");
             body.classList.add("bg-slate-100", "text-gray-900");
             body.classList.remove("bg-slate-900", "text-slate-100");
-            darkLabel?.classList.remove("hidden");
-            lightLabel?.classList.add("hidden");
-            if (syncInput) toggleInput.checked = false;
+            themeDarkLabel?.classList.remove("hidden");
+            themeLightLabel?.classList.add("hidden");
+            if (syncInput) themeToggle.checked = false;
           }
         }
 
-        const initialTheme = stored ?? (prefersDark ? "dark" : timeBasedDefault);
-        apply(initialTheme);
+        function applyCompact(mode, syncInput = true) {
+          const body = document.body;
+          if (mode === "on") {
+            body.classList.add("compact-mode");
+            compactDarkLabel?.classList.add("hidden");
+            compactLightLabel?.classList.remove("hidden");
+            if (syncInput) compactToggle.checked = true;
+          } else {
+            body.classList.remove("compact-mode");
+            compactDarkLabel?.classList.remove("hidden");
+            compactLightLabel?.classList.add("hidden");
+            if (syncInput) compactToggle.checked = false;
+          }
+        }
 
-        toggleInput.addEventListener("change", () => {
-          const next = toggleInput.checked ? "dark" : "light";
+        const initialTheme = storedTheme ?? (prefersDark ? "dark" : timeBasedDefault);
+        applyTheme(initialTheme);
+        const initialCompact = storedCompact ?? "off";
+        applyCompact(initialCompact);
+
+        themeToggle.addEventListener("change", () => {
+          const next = themeToggle.checked ? "dark" : "light";
           localStorage.setItem("usthing-theme", next);
-          apply(next, false);
+          applyTheme(next, false);
+        });
+
+        compactToggle.addEventListener("change", () => {
+          const next = compactToggle.checked ? "on" : "off";
+          localStorage.setItem("usthing-compact", next);
+          applyCompact(next, false);
         });
       })();
     </script>

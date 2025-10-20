@@ -20,9 +20,43 @@ This repository currently bundles the original Go-based gym slot scanner togethe
 ## Current Worker Behaviour
 
 * Fetches all configured facilities (`2,3,4,5,79,80,100,101`) from the USThing API and aggregates results into a unified slot model.
+* Persists the latest 14-day window (≈1560 rows) into Cloudflare D1 (`slot_snapshot` table), trimming anything outside the horizon each minute.
+* Reads back from D1 when serving HTTP responses so the dashboard/API always reflect the stored snapshot (even if the live fetch fails).
 * Renders a dashboard with dark/compact toggles, JWT warnings, facility status grids, and responsive/mobile layouts.
 * Emits warnings to the UI and JSON response whenever the Bearer token is missing/expired (401 or JWT errors).
 * PushDeer integration is present but disabled unless the worker is supplied with PushDeer keys.
+
+### D1 storage
+
+* Table definition (`d1/schema.sql`):
+
+  ```sql
+  CREATE TABLE IF NOT EXISTS slot_snapshot (
+    facility_id   TEXT    NOT NULL,
+    slot_date     TEXT    NOT NULL,
+    start_time    TEXT    NOT NULL,
+    end_time      TEXT    NOT NULL,
+    status        TEXT    NOT NULL,
+    activity_name TEXT,
+    updated_at    TEXT    NOT NULL,
+    PRIMARY KEY (facility_id, slot_date, start_time)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_slot_snapshot_date
+    ON slot_snapshot (slot_date);
+  ```
+
+* Configure Wrangler with the D1 binding:
+
+  ```toml
+  [[d1_databases]]
+  binding = "DB"
+  database_name = "slot-data"
+  database_id = "<replace-with-your-d1-id>"
+  ```
+
+* Persist/load helpers live in `ts/db/slots.ts`.
+* When the Worker starts, it fetches fresh data, runs `persistSlots`, and then renders from the D1 snapshot. If persistence or reload fails, a warning is appended so operators know the snapshot may be stale.
 
 ## Planned Multi-Worker Split (Future Work)
 

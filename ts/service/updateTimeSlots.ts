@@ -24,7 +24,7 @@ export function convertUSThingToUnified(
     StartTime: slot.startTime,
     EndTime: slot.endTime,
     Status: slot.timeslotStatus,
-    ActivityName: slot.activityName,
+    ActivityName: slot.activityName?.trim() ?? "",
   }));
 }
 

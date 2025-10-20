@@ -7,8 +7,10 @@ import {
 } from "./types";
 import { getTodayUTC8, getDateDaysAhead } from "./utils/time";
 import { renderSlotsTable } from "./views/table";
+import { persistSlots, loadSlots } from "./db/slots";
 
 export interface WorkerEnv {
+  DB: D1Database;
   PUSHDEER_KEYS?: string;
   USTHING_UST_ID?: string;
   USTHING_USER_TYPE?: string;
@@ -53,32 +55,51 @@ function parseUSThingConfig(env?: WorkerEnv): USThingConfig {
 }
 
 export async function runTimeslotSync(
-  env?: WorkerEnv,
-  fetchImpl: typeof fetch = fetch
-): Promise<{ slots: UnifiedTimeSlot[]; warnings: string[] }> {
+  env: WorkerEnv,
+  fetchImpl: typeof fetch = fetch,
+  startDate?: string,
+  endDate?: string
+): Promise<{
+  slots: UnifiedTimeSlot[];
+  warnings: string[];
+  startDate: string;
+  endDate: string;
+  generatedAt: Date;
+}> {
+  const effectiveStart = startDate ?? getTodayUTC8();
+  const effectiveEnd = endDate ?? getDateDaysAhead(14);
   const usthingConfig = parseUSThingConfig(env);
-  const startDate = getTodayUTC8();
-  const endDate = getDateDaysAhead(14);
   const warnings: string[] = [];
 
   console.log(
     `[USThing] Starting sync for facilities ${usthingConfig.facilityIDs.join(
       ", "
-    )} from ${startDate} to ${endDate} (ustID length: ${
+    )} from ${effectiveStart} to ${effectiveEnd} (ustID length: ${
       usthingConfig.ustID.length
     }, bearer provided: ${Boolean(usthingConfig.bearer)})`
   );
+
+  const generatedAt = new Date();
 
   const slots = await updateUSThingTimeSlots({
     ustID: usthingConfig.ustID,
     userType: usthingConfig.userType,
     facilityIDs: usthingConfig.facilityIDs,
-    startDate,
-    endDate,
+    startDate: effectiveStart,
+    endDate: effectiveEnd,
     bearer: usthingConfig.bearer,
     fetchImpl,
     warnings,
   });
+
+  try {
+    await persistSlots(env.DB, slots, effectiveStart, effectiveEnd, generatedAt);
+  } catch (error) {
+    console.error("Failed to persist slot snapshot to D1", error);
+    warnings.push(
+      "Unable to persist slot data to D1. The dashboard may serve stale results."
+    );
+  }
 
   const pushConfig = parsePushConfig(env);
 
@@ -108,7 +129,7 @@ export async function runTimeslotSync(
     console.warn("[USThing] No slots returned in this sync");
   }
 
-  return { slots, warnings };
+  return { slots, warnings, startDate: effectiveStart, endDate: effectiveEnd, generatedAt };
 }
 
 export default {
@@ -121,8 +142,42 @@ export default {
       return new Response("Method Not Allowed", { status: 405 });
     }
 
-    const { slots, warnings } = await runTimeslotSync(env);
     const url = new URL(request.url);
+    const startDate = getTodayUTC8();
+    const endDate = getDateDaysAhead(14);
+    const forceRefresh = url.searchParams.get("refresh") === "1";
+    let warnings: string[] = [];
+    let generatedAt = new Date();
+
+    let { slots: dbSlots, latestUpdatedAt } = await loadSlots(
+      env.DB,
+      startDate,
+      endDate
+    );
+
+    if (dbSlots.length === 0 || forceRefresh) {
+      const syncResult = await runTimeslotSync(env, fetch, startDate, endDate);
+      warnings = warnings.concat(syncResult.warnings);
+      generatedAt = syncResult.generatedAt;
+      const reload = await loadSlots(env.DB, startDate, endDate);
+      dbSlots = reload.slots;
+      latestUpdatedAt = reload.latestUpdatedAt ?? latestUpdatedAt;
+    }
+
+    if (latestUpdatedAt) {
+      const parsed = new Date(latestUpdatedAt);
+      if (!Number.isNaN(parsed.getTime())) {
+        generatedAt = parsed;
+      }
+    }
+
+    let displaySlots = dbSlots;
+    if (!displaySlots.length) {
+      warnings.push(
+        "No slot data is currently available. The D1 snapshot may be empty."
+      );
+    }
+
     const format = url.searchParams.get("format");
     const accept = request.headers.get("Accept") ?? "";
     const wantsHtml = format === "html" || accept.includes("text/html");
@@ -134,8 +189,8 @@ export default {
       baseParams.set("format", "html");
       baseParams.delete("page");
       const baseQuery = baseParams.toString();
-      const html = renderSlotsTable(slots, {
-        generatedAt: new Date(),
+      const html = renderSlotsTable(displaySlots, {
+        generatedAt,
         page,
         pageSize: 8,
         basePath: url.pathname,
@@ -148,7 +203,15 @@ export default {
     }
 
     const body = JSON.stringify(
-      { count: slots.length, slots, warnings },
+      {
+        count: displaySlots.length,
+        startDate,
+        endDate,
+        refreshed: forceRefresh,
+        lastUpdatedAt: generatedAt.toISOString(),
+        warnings,
+        slots: displaySlots,
+      },
       null,
       2
     );
@@ -162,6 +225,15 @@ export default {
     env: WorkerEnv,
     ctx: ExecutionContext
   ): Promise<void> {
-    ctx.waitUntil(runTimeslotSync(env).then(() => undefined));
+    const startDate = getTodayUTC8();
+    const endDate = getDateDaysAhead(14);
+    ctx.waitUntil(
+      (async () => {
+        const result = await runTimeslotSync(env, fetch, startDate, endDate);
+        if (result.warnings.length) {
+          console.warn("Scheduled sync warnings:", result.warnings);
+        }
+      })()
+    );
   },
 };

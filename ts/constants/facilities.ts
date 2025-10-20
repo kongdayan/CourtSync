@@ -3,10 +3,10 @@ const facilityMap: Record<string, string> = {
   "3": "LG1C2",
   "4": "LG1C3",
   "5": "LG1C4",
-  "79": "LG1-C5",
-  "80": "LG1-C6",
-  "100": "SF-C1",
-  "101": "SF-C2",
+  "79": "LG1C5",
+  "80": "LG1C6",
+  "100": "SFC1",
+  "101": "SFC2",
 };
 
 export function resolveFacilityName(id: string): string {

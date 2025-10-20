@@ -42,7 +42,7 @@ function parseUSThingConfig(env?: WorkerEnv): USThingConfig {
     env?.USTHING_FACILITY_IDS
       ?.split(",")
       .map((id) => id.trim())
-      .filter(Boolean) ?? ["2", "3", "4", "5", "79", "80"];
+      .filter(Boolean) ?? ["2", "3", "4", "5", "79", "80", "100", "101"];
 
   return {
     ustID,

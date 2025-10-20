@@ -76,7 +76,7 @@ export async function updateUSThingTimeSlots(
   options: USThingOptions
 ): Promise<UnifiedTimeSlot[]> {
   const {
-    facilityIDs = ["2", "3", "4", "5", "79", "80"],
+    facilityIDs = ["2", "3", "4", "5", "79", "80", "100", "101"],
     fetchImpl = fetch,
     bearer,
     warnings,

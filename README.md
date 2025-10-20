@@ -1,119 +1,106 @@
-# Booking Service
+# FBS HKUST Spider
 
-This project is a Go-based service that sends automated booking requests to the API endpoint at `https://w5.ab.ust.hk/msalum/api/app/fbs/bookings`. The service is configured to run as a background system process using `systemd`, and it will automatically trigger requests every day at a specific time (7:59:50 AM UTC+8).
+Fetch, persist, and visualise USThing badminton court availability. This repository now bundles the original Go-based CLI scanner together with the Cloudflare Worker that powers the web dashboard.
 
-## Features
+- **Live snapshot**: A Cloudflare Worker fetches slot data, stores the latest 14-day window in D1, and renders an HTML table or JSON feed.
+- **Cron refresh**: Cloudflare Scheduler triggers the worker every minute between 08:00–22:59 (UTC+8) to keep the snapshot fresh.
+- **Push (optional)**: PushDeer notifications can be enabled for new availability.
+- **Legacy tooling**: The Go modules in `internal/` continue to support local/CLI workflows and share logic with the TypeScript side.
 
-- Automatically runs every day at 7:59:50 AM (UTC+8) and finishes at 8:00:10 AM.
-- Sends booking requests for a list of facilities every second during the scheduled time.
-- Error handling and retry logic for failed requests.
+GitHub: <https://github.com/kongdayan/FBS_HKUST_Spider>
 
-## Prerequisites
+## Directory Map
 
-- [Go](https://golang.org/doc/install) (Golang 1.18+)
-- Linux system with `systemd` support
-- Network access to `https://w5.ab.ust.hk/msalum/api/app/fbs/bookings`
+- `ts/` – Cloudflare Worker implementation (handlers, services, views, D1 helpers).
+- `d1/schema.sql` – D1 `slot_snapshot` table definition.
+- `wrangler.toml` – Worker configuration, including cron and D1 binding.
+- `internal/`, `cmd/`, `templates/` – Legacy Go scanner and HTML output.
 
-## Installation
-
-1. Clone the repository:
-
-    ```bash
-    git clone <repository-url>
-    cd <project-directory>
-    ```
-
-2. Build the Go project:
-
-    ```bash
-    go build -o booking-service main.go
-    ```
-
-3. Move the executable to `/usr/local/bin`:
-
-    ```bash
-    sudo mv booking-service /usr/local/bin/
-    sudo chmod +x /usr/local/bin/booking-service
-    ```
-
-## Running as a `systemd` Service
-
-To run this project as a service, you'll need to create a `systemd` service file.
-
-1. Create a `booking.service` file:
-
-    ```bash
-    sudo nano /etc/systemd/system/booking.service
-    ```
-
-2. Add the following configuration to the file:
-
-    ```ini
-    [Unit]
-    Description=Booking Service
-    After=network.target
-
-    [Service]
-    ExecStart=/usr/local/bin/booking-service
-    Restart=always
-    RestartSec=10
-    User=nobody
-    WorkingDirectory=/usr/local/bin/
-    StandardOutput=syslog
-    StandardError=syslog
-    SyslogIdentifier=booking-service
-
-    [Install]
-    WantedBy=multi-user.target
-    ```
-
-3. Reload `systemd`:
-
-    ```bash
-    sudo systemctl daemon-reload
-    ```
-
-4. Start and enable the service:
-
-    ```bash
-    sudo systemctl start booking.service
-    sudo systemctl enable booking.service
-    ```
-
-## Usage
-
-Once the service is set up and running, it will automatically execute every day at 7:59:50 AM (UTC+8), sending requests for booking facilities `2`, `3`, `4`, and `5`.
-
-You can monitor the service status using:
+## Quick Start
 
 ```bash
-sudo systemctl status booking.service
+git clone https://github.com/kongdayan/FBS_HKUST_Spider
+cd FBS_HKUST_Spider
+npm install
+
+# Local dev with cron simulation and Tailwind-rendered HTML
+npx wrangler dev --test-scheduled
 ```
 
-To view logs:
+### Environment
+
+| Variable | Description |
+| --- | --- |
+| `USTHING_BEARER` | Required. Bearer JWT from the USThing app. |
+| `USTHING_UST_ID` | Optional. Defaults to empty (USThing allows bearer-only). |
+| `USTHING_USER_TYPE` | Optional. Default `01`. |
+| `USTHING_FACILITY_IDS` | Comma-separated facility IDs (defaults to `2,3,4,5,79,80,100,101`). |
+| `PUSHDEER_KEYS` | Optional. Comma-separated PushDeer keys. |
+
+During local dev you can use `.dev.vars` or export variables before `wrangler dev`. For production, store secrets using `wrangler secret put`.
+
+## Scheduled Sync
+
+`wrangler.toml` defines:
+
+```toml
+[triggers]
+crons = ["* 8-22 * * *"]
+```
+
+That means Cloudflare Scheduler runs the worker once per minute from 08:00 to 22:59 (UTC+8). Every invocation:
+
+1. Calls USThing for configured facilities and date range (`today` + 14 days).
+2. Persists the snapshot into D1 (`slot_snapshot` table).
+3. Enqueues optional PushDeer notifications.
+4. When hit via HTTP, the worker renders the latest snapshot (without retrying unless `?refresh=1` is passed).
+
+## Deployment
+
+You can deploy manually:
 
 ```bash
-sudo journalctl -u booking.service
+npx wrangler deploy
 ```
 
-## Configuration
-You can modify the facilityIDs or the request scheduling by editing the main.go file.
+Or automate via GitHub Actions:
 
-To modify the API authorization token or adjust timeouts and retry logic, you can update the respective parts of the Go code.
+```yaml
+name: Deploy Worker
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm run deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+```
+
+Create a Cloudflare API token with *Edit Workers* permissions and add it plus your account ID as repo secrets (`CF_API_TOKEN`, `CF_ACCOUNT_ID`).
+
+## Legacy Go Scanner (Optional)
+
+The original Go-based workflow is still available:
+
+```bash
+go run ./cmd/fbs-scan
+```
+
+It shares service logic with the worker and can be extended for CLI automation or additional data exports.
 
 ## License
-This project is licensed under the MIT License.
 
-### Key Sections of the `README.md`:
-- **Project Overview**: Describes the purpose of the project and its primary functionality.
-- **Prerequisites**: Lists the required software and environment setup.
-- **Installation**: Provides a step-by-step guide to setting up and installing the project.
-- **Running as a `systemd` Service**: Explains how to set up the Go program to run automatically as a background service.
-- **Usage**: Describes how to monitor the service and how it works.
-- **Configuration**: Explains how to modify the code or configuration if needed.
-
-Feel free to customize this `README` further according to any specific features or requirements of your project!
-
+MIT © kongdayan
 
 
 

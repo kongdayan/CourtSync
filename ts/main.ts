@@ -11,12 +11,15 @@ import { persistSlots, loadSlots } from "./db/slots";
 
 export interface WorkerEnv {
   DB: D1Database;
+  hkust_token?: KVNamespace;
   PUSHDEER_KEYS?: string;
   USTHING_UST_ID?: string;
   USTHING_USER_TYPE?: string;
   USTHING_FACILITY_IDS?: string;
   USTHING_BEARER?: string;
 }
+
+const USTHING_BEARER_KV_KEY = "usthing:bearer";
 
 function parsePushConfig(env?: WorkerEnv): PushDeerConfig | null {
   const rawKeys = env?.PUSHDEER_KEYS;
@@ -36,7 +39,43 @@ function parsePushConfig(env?: WorkerEnv): PushDeerConfig | null {
   return { pushKeys };
 }
 
-function parseUSThingConfig(env?: WorkerEnv): USThingConfig {
+async function resolveUSThingBearer(
+  env: WorkerEnv,
+  warnings: string[]
+): Promise<string | undefined> {
+  const inlineBearer = env.USTHING_BEARER?.trim();
+  if (inlineBearer) {
+    return inlineBearer;
+  }
+
+  if (!env.hkust_token) {
+    warnings.push(
+      "USThing bearer token is not configured. Update the KV key or set the USTHING_BEARER secret."
+    );
+    return undefined;
+  }
+
+  try {
+    const kvValue = await env.hkust_token.get(USTHING_BEARER_KV_KEY, "text");
+    const trimmed = kvValue?.trim();
+    if (trimmed) {
+      return trimmed;
+    }
+    warnings.push(
+      `USThing bearer token not found in KV namespace (binding "hkust_token", key "${USTHING_BEARER_KV_KEY}").`
+    );
+  } catch (error) {
+    console.error("Failed to read USThing bearer from KV", error);
+    warnings.push("Unable to read USThing bearer token from KV.");
+  }
+
+  return undefined;
+}
+
+async function parseUSThingConfig(
+  env: WorkerEnv,
+  warnings: string[]
+): Promise<USThingConfig> {
   const ustID = env?.USTHING_UST_ID?.trim() ?? "";
   const userType = env?.USTHING_USER_TYPE?.trim() ?? "01";
 
@@ -50,7 +89,7 @@ function parseUSThingConfig(env?: WorkerEnv): USThingConfig {
     ustID,
     userType,
     facilityIDs,
-    bearer: env?.USTHING_BEARER?.trim() || undefined,
+    bearer: await resolveUSThingBearer(env, warnings),
   };
 }
 
@@ -68,8 +107,8 @@ export async function runTimeslotSync(
 }> {
   const effectiveStart = startDate ?? getTodayUTC8();
   const effectiveEnd = endDate ?? getDateDaysAhead(14);
-  const usthingConfig = parseUSThingConfig(env);
   const warnings: string[] = [];
+  const usthingConfig = await parseUSThingConfig(env, warnings);
 
   console.log(
     `[USThing] Starting sync for facilities ${usthingConfig.facilityIDs.join(

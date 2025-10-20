@@ -31,13 +31,19 @@ npx wrangler dev --test-scheduled
 
 | Variable | Description |
 | --- | --- |
-| `USTHING_BEARER` | Required. Bearer JWT from the USThing app. |
+| `USTHING_BEARER` | Optional. Inline bearer JWT (mostly for local dev); in production the worker reads key `usthing:bearer` from the `hkust_token` KV namespace. |
 | `USTHING_UST_ID` | Optional. Defaults to empty (USThing allows bearer-only). |
 | `USTHING_USER_TYPE` | Optional. Default `01`. |
 | `USTHING_FACILITY_IDS` | Comma-separated facility IDs (defaults to `2,3,4,5,79,80,100,101`). |
 | `PUSHDEER_KEYS` | Optional. Comma-separated PushDeer keys. |
 
-During local dev you can use `.dev.vars` or export variables before `wrangler dev`. For production, store secrets using `wrangler secret put`.
+During local dev you can use `.dev.vars` or export variables before `wrangler dev`. For production, write secrets to the KV namespace:
+
+```bash
+wrangler kv:key put --binding=hkust_token usthing:bearer "Bearer <jwt>"
+```
+
+You can still set `USTHING_BEARER` for ad-hoc testing; KV takes precedence in production.
 
 ## Scheduled Sync
 
@@ -101,8 +107,6 @@ It shares service logic with the worker and can be extended for CLI automation o
 ## License
 
 MIT © kongdayan
-
-
 
 
 

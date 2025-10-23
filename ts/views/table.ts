@@ -190,7 +190,10 @@ export function renderSlotsTable(
         display: grid;
         gap: 0.45rem;
         grid-template-columns: repeat(4, minmax(0, 1fr));
-        grid-template-rows: repeat(2, minmax(0, 1fr));
+        grid-auto-rows: minmax(0, 1fr);
+      }
+      .source-jiushi .slot-cell {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
       }
       .slot-badge {
         position: relative;
@@ -275,9 +278,9 @@ export function renderSlotsTable(
         }
       }
       th.time-col {
-        width: 7rem;
-        min-width: 7rem;
-        max-width: 7rem;
+        width: 4.75rem;
+        min-width: 4.75rem;
+        max-width: 4.75rem;
       }
       .theme-toggle,
       .compact-toggle {
@@ -337,6 +340,9 @@ export function renderSlotsTable(
       .compact-mode .slot-cell {
         gap: 0.12rem;
       }
+      .source-jiushi.compact-mode .slot-cell {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+      }
       .compact-mode .slot-badge {
         font-size: 0.48rem;
         line-height: 0.55rem;
@@ -347,9 +353,37 @@ export function renderSlotsTable(
       .compact-mode .slot-badge .slot-label {
         display: none;
       }
+      .desktop-table table {
+        border-collapse: collapse;
+      }
+      .desktop-table table th,
+      .desktop-table table td {
+        border: 1.5px solid rgba(148, 163, 184, 0.65);
+      }
+      .desktop-table table thead th {
+        border-bottom: 2px solid rgba(100, 116, 139, 0.75);
+      }
+      .desktop-table table th.time-col {
+        border-left-width: 0;
+      }
+      .desktop-table table tr th:first-child,
+      .desktop-table table tr td:first-child {
+        border-left-width: 0;
+      }
+      .desktop-table table tr th:last-child,
+      .desktop-table table tr td:last-child {
+        border-right-width: 0;
+      }
+      .dark .desktop-table table th,
+      .dark .desktop-table table td {
+        border-color: rgba(71, 85, 105, 0.85);
+      }
+      .dark .desktop-table table thead th {
+        border-bottom-color: rgba(100, 116, 139, 0.95);
+      }
     </style>
   </head>
-  <body class="bg-slate-100 text-gray-900 transition-colors duration-300 dark:bg-slate-900 dark:text-slate-100">
+  <body class="bg-slate-100 text-gray-900 transition-colors duration-300 dark:bg-slate-900 dark:text-slate-100 source-${options.source}">
     <div class="max-w-8xl mx-auto px-6 py-6 space-y-5">
       <section class="rounded-lg bg-white p-6 shadow-sm ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700">
         <div class="flex flex-wrap items-center justify-between gap-3">
@@ -446,7 +480,7 @@ export function renderSlotsTable(
       </div>
 
       <div class="desktop-table overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
-        <table class="min-w-full table-fixed divide-y divide-slate-200 text-sm dark:divide-slate-700">
+        <table class="min-w-full table-fixed text-sm">
           <thead class="bg-slate-50 dark:bg-slate-700">
             <tr>
               <th class="time-col sticky left-0 bg-slate-50 px-3 py-2 text-left font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-100">Time</th>
@@ -458,7 +492,7 @@ export function renderSlotsTable(
                 .join("")}
             </tr>
           </thead>
-          <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
+          <tbody>
             ${
               datesToDisplay.length
                 ? timeLabels

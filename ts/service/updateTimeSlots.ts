@@ -185,6 +185,7 @@ export interface JiushiOptions {
   fetchImpl?: typeof fetch;
   allowedGroundIds?: string[];
   warnings?: string[];
+  maxDays?: number;
 }
 
 export async function updateJiushiTimeSlots(
@@ -192,6 +193,9 @@ export async function updateJiushiTimeSlots(
 ): Promise<UnifiedTimeSlot[]> {
   const { fetchImpl = fetch, warnings, allowedGroundIds } = options;
   const dates = enumerateDateRangeInclusive(options.startDate, options.endDate);
+  const boundedDates = options.maxDays
+    ? dates.slice(0, Math.max(1, options.maxDays))
+    : dates;
   const groundsFilter = allowedGroundIds?.length
     ? new Set(allowedGroundIds)
     : null;
@@ -206,11 +210,11 @@ export async function updateJiushiTimeSlots(
   };
 
   console.log(
-    `[Jiushi] Fetching venue ${options.venueId} for ${dates.length} day(s)`
+    `[Jiushi] Fetching venue ${options.venueId} for ${boundedDates.length} day(s)`
   );
 
   const aggregated: UnifiedTimeSlot[] = [];
-  for (const date of dates) {
+  for (const date of boundedDates) {
     try {
       const slots = await jiushi.getUnifiedSlotsForDate(
         options.venueId,

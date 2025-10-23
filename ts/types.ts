@@ -41,4 +41,5 @@ export interface USThingConfig {
 export interface JiushiConfig {
   venueId: string;
   allowedGroundIds: string[];
+  maxDays: number;
 }

@@ -26,6 +26,7 @@ export interface WorkerEnv {
   TOKEN_ADMIN_SECRET?: string;
   JIUSHI_VENUE_ID?: string;
   JIUSHI_GROUND_IDS?: string;
+  JIUSHI_MAX_DAYS?: string;
 }
 
 const USTHING_BEARER_KV_KEY = "usthing:bearer";
@@ -250,9 +251,15 @@ function parseJiushiConfig(
       .map((item) => item.trim())
       .filter(Boolean) ?? [];
 
+  const parsedMaxDays = Number.parseInt(env?.JIUSHI_MAX_DAYS ?? "", 10);
+  const maxDays = Number.isFinite(parsedMaxDays) && parsedMaxDays > 0
+    ? Math.min(parsedMaxDays, 31)
+    : 9;
+
   return {
     venueId,
     allowedGroundIds,
+    maxDays,
   };
 }
 
@@ -365,6 +372,7 @@ async function runJiushiTimeslotSync(
     endDate: effectiveEnd,
     fetchImpl,
     warnings,
+    maxDays: config.maxDays,
   });
 
   if (!env.JIUSHI_DB) {

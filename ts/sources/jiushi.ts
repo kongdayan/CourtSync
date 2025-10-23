@@ -130,7 +130,7 @@ export function responseToUnifiedSlots(
         Date: date,
         StartTime: start,
         EndTime: end,
-        Status: block.status === "0" ? "Available" : "Unavailable",
+        Status: block.status === "1" ? "Available" : "Unavailable",
         ActivityName: block.groundName || "",
       });
     }

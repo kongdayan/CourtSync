@@ -40,6 +40,7 @@ npx wrangler dev --test-scheduled
 | `TOKEN_ADMIN_SECRET` | Optional. Passphrase required when updating the bearer token via `/admin/token`. |
 | `JIUSHI_VENUE_ID` | Required when enabling Jiushi sync. Venue identifier passed to the Jiushi API (e.g. `27`). |
 | `JIUSHI_GROUND_IDS` | Optional. Comma-separated Jiushi ground IDs to persist (defaults to all courts returned by the API). |
+| `JIUSHI_MAX_DAYS` | Optional. Maximum number of Jiushi booking days to fetch (default 9 to stay within their booking window). |
 
 Provision two D1 databases using the schema in `d1/schema.sql`: one bound to `DB` (USThing) and one to `JIUSHI_DB` (Jiushi).
 

@@ -41,4 +41,6 @@ USTHING_USER_TYPE = "01"
 # Required to enable Jiushi sync
 JIUSHI_VENUE_ID = "27"
 # Optional: restrict Jiushi grounds
-JIUSHI_GROUND_IDS = "151,152,153"
+# JIUSHI_GROUND_IDS = "151,152,153"
+# Optional: cap Jiushi fetch days (default 9)
+JIUSHI_MAX_DAYS = "9"

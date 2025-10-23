@@ -320,6 +320,38 @@ export function renderSlotsTable(
       input:checked + .toggle-track .toggle-thumb {
         transform: translateX(1.3rem);
       }
+      .action-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        border-radius: 999px;
+        padding: 0.45rem 0.9rem;
+        font-size: 0.8rem;
+        font-weight: 600;
+        border: 1px solid rgba(8, 77, 106, 0.32);
+        background: rgba(72, 190, 197, 0.18);
+        color: #084d6a;
+        transition: background 0.15s ease, border 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+      }
+      .action-button:hover {
+        background: rgba(72, 190, 197, 0.26);
+        border-color: rgba(8, 77, 106, 0.4);
+        box-shadow: 0 12px 20px rgba(8, 77, 106, 0.18);
+      }
+      .action-button:disabled {
+        opacity: 0.55;
+        cursor: progress;
+        box-shadow: none;
+      }
+      .dark .action-button {
+        border-color: rgba(72, 190, 197, 0.42);
+        background: rgba(8, 77, 106, 0.55);
+        color: rgba(240, 241, 183, 0.85);
+      }
+      .dark .action-button:hover {
+        background: rgba(8, 77, 106, 0.68);
+        box-shadow: 0 16px 24px rgba(3, 16, 26, 0.45);
+      }
       .mobile-grid {
         display: none;
       }
@@ -331,6 +363,14 @@ export function renderSlotsTable(
           display: grid;
           gap: 1rem;
         }
+      }
+      .desktop-table.capture-mode {
+        overflow: visible !important;
+        display: block !important;
+        box-shadow: none;
+      }
+      .desktop-table.capture-mode table {
+        width: max-content !important;
       }
       /* Compact view overrides */
       .compact-mode td[data-slot-cell] {
@@ -391,27 +431,33 @@ export function renderSlotsTable(
             <h1 class="text-2xl font-bold text-slate-900 dark:text-slate-100">📊 ${escapeHtml(activeSourceLabel)} Timeslot Dashboard</h1>
             <p class="text-sm text-slate-600 dark:text-slate-300">Live snapshot grouped by date and timeslot</p>
           </div>
-          <div class="flex items-center gap-3 text-xs text-slate-600 dark:text-slate-300">
-            <label class="compact-toggle">
-              <input id="compact-toggle" type="checkbox" />
-              <span class="toggle-track">
-                <span class="toggle-thumb"></span>
-              </span>
-              <span class="toggle-label">
-                <span class="toggle-label-dark">Detailed</span>
-                <span class="toggle-label-light hidden">Compact</span>
-              </span>
-            </label>
-            <label class="theme-toggle">
-              <input id="theme-toggle" type="checkbox" />
-              <span class="toggle-track">
-                <span class="toggle-thumb"></span>
-              </span>
-              <span class="toggle-label">
-                <span class="toggle-label-dark">Dark</span>
-                <span class="toggle-label-light hidden">Light</span>
-              </span>
-            </label>
+          <div class="flex flex-wrap items-center gap-3 text-xs text-slate-600 dark:text-slate-300">
+            <button id="capture-button" type="button" class="action-button">
+              <span aria-hidden="true">📸</span>
+              <span>导出快照</span>
+            </button>
+            <div class="flex items-center gap-3">
+              <label class="compact-toggle">
+                <input id="compact-toggle" type="checkbox" />
+                <span class="toggle-track">
+                  <span class="toggle-thumb"></span>
+                </span>
+                <span class="toggle-label">
+                  <span class="toggle-label-dark">Detailed</span>
+                  <span class="toggle-label-light hidden">Compact</span>
+                </span>
+              </label>
+              <label class="theme-toggle">
+                <input id="theme-toggle" type="checkbox" />
+                <span class="toggle-track">
+                  <span class="toggle-thumb"></span>
+                </span>
+                <span class="toggle-label">
+                  <span class="toggle-label-dark">Dark</span>
+                  <span class="toggle-label-light hidden">Light</span>
+                </span>
+              </label>
+            </div>
           </div>
         </div>
         ${sourceSelector}
@@ -607,8 +653,13 @@ export function renderSlotsTable(
     </div>
     <script>
       (function () {
+        const captureMeta = ${JSON.stringify({
+          source: options.source,
+          dates: datesToDisplay,
+        })};
         const themeToggle = document.getElementById("theme-toggle");
         const compactToggle = document.getElementById("compact-toggle");
+        const captureButton = document.getElementById("capture-button");
         if (!(themeToggle instanceof HTMLInputElement) || !(compactToggle instanceof HTMLInputElement)) return;
         const themeDarkLabel = document.querySelector(".theme-toggle .toggle-label-dark");
         const themeLightLabel = document.querySelector(".theme-toggle .toggle-label-light");
@@ -670,6 +721,88 @@ export function renderSlotsTable(
           const next = compactToggle.checked ? "on" : "off";
           localStorage.setItem("usthing-compact", next);
           applyCompact(next, false);
+        });
+
+        let html2canvasLoader;
+        function loadHtml2Canvas() {
+          if (window.html2canvas) {
+            return Promise.resolve(window.html2canvas);
+          }
+          if (!html2canvasLoader) {
+            html2canvasLoader = new Promise((resolve, reject) => {
+              const script = document.createElement("script");
+              script.src = "https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js";
+              script.async = true;
+              script.onload = () => resolve(window.html2canvas);
+              script.onerror = () => reject(new Error("html2canvas failed to load"));
+              document.head.appendChild(script);
+            });
+          }
+          return html2canvasLoader;
+        }
+
+        async function exportSnapshot() {
+          if (!(captureButton instanceof HTMLButtonElement)) {
+            return;
+          }
+          const scrollTop = window.scrollY;
+          const scrollLeft = window.scrollX;
+          const desktopTable = document.querySelector(".desktop-table");
+          const mobileGrid = document.querySelector(".mobile-grid");
+          const target = desktopTable || mobileGrid;
+          if (!target) {
+            alert("未找到可以导出的表格内容。");
+            return;
+          }
+
+          captureButton.disabled = true;
+          const originalLabel = captureButton.innerHTML;
+          captureButton.innerHTML = "导出中…";
+
+          let table;
+          let originalWidth;
+          try {
+            const html2canvas = await loadHtml2Canvas();
+            if (desktopTable) {
+              desktopTable.scrollLeft = 0;
+            }
+            table = target.querySelector("table");
+            originalWidth = table?.style.width;
+            target.classList?.add("capture-mode");
+            if (table) {
+              table.style.width = table.scrollWidth + "px";
+            }
+            window.scrollTo(0, 0);
+
+            const canvas = await html2canvas(target, {
+              backgroundColor: getComputedStyle(document.body).backgroundColor || "#ffffff",
+              scale: Math.min(window.devicePixelRatio || 1, 2),
+              useCORS: true,
+            });
+
+            const link = document.createElement("a");
+            const dates = captureMeta.dates || [];
+            const dateRange = dates.length ? dates[0] + "-" + dates[dates.length - 1] : "no-data";
+            const sourceName = captureMeta.source || "slots";
+            link.download = sourceName + "-" + dateRange + ".png";
+            link.href = canvas.toDataURL("image/png");
+            link.click();
+          } catch (error) {
+            console.error("Failed to export snapshot", error);
+            alert("生成截图失败，请稍后再试。");
+          } finally {
+            if (table) {
+              table.style.width = originalWidth || "";
+            }
+            target.classList?.remove("capture-mode");
+            window.scrollTo(scrollLeft, scrollTop);
+            captureButton.innerHTML = originalLabel;
+            captureButton.disabled = false;
+          }
+        }
+
+        captureButton?.addEventListener("click", () => {
+          exportSnapshot();
         });
       })();
     </script>

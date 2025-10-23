@@ -1,9 +1,14 @@
-import { updateUSThingTimeSlots } from "./service/updateTimeSlots";
+import {
+  updateUSThingTimeSlots,
+  updateJiushiTimeSlots,
+} from "./service/updateTimeSlots";
 import { PushDeerService } from "./notifications/pushdeer";
 import {
   UnifiedTimeSlot,
   PushDeerConfig,
   USThingConfig,
+  JiushiConfig,
+  DataSourceKey,
 } from "./types";
 import { getTodayUTC8, getDateDaysAhead } from "./utils/time";
 import { renderSlotsTable } from "./views/table";
@@ -11,6 +16,7 @@ import { persistSlots, loadSlots } from "./db/slots";
 
 export interface WorkerEnv {
   DB: D1Database;
+  JIUSHI_DB?: D1Database;
   hkust_token?: KVNamespace;
   PUSHDEER_KEYS?: string;
   USTHING_UST_ID?: string;
@@ -18,9 +24,31 @@ export interface WorkerEnv {
   USTHING_FACILITY_IDS?: string;
   USTHING_BEARER?: string;
   TOKEN_ADMIN_SECRET?: string;
+  JIUSHI_VENUE_ID?: string;
+  JIUSHI_GROUND_IDS?: string;
 }
 
 const USTHING_BEARER_KV_KEY = "usthing:bearer";
+
+const DEFAULT_DATA_SOURCE: DataSourceKey = "usthing";
+const AVAILABLE_SOURCES: DataSourceKey[] = ["usthing", "jiushi"];
+
+function normalizeDataSource(value: string | null | undefined): DataSourceKey {
+  const normalized = value?.trim().toLowerCase();
+  if (normalized === "jiushi") {
+    return "jiushi";
+  }
+  return DEFAULT_DATA_SOURCE;
+}
+
+export interface TimeslotSyncResult {
+  source: DataSourceKey;
+  slots: UnifiedTimeSlot[];
+  warnings: string[];
+  startDate: string;
+  endDate: string;
+  generatedAt: Date;
+}
 
 function parsePushConfig(env?: WorkerEnv): PushDeerConfig | null {
   const rawKeys = env?.PUSHDEER_KEYS;
@@ -204,18 +232,36 @@ async function parseUSThingConfig(
   };
 }
 
-export async function runTimeslotSync(
+function parseJiushiConfig(
+  env: WorkerEnv,
+  warnings: string[]
+): JiushiConfig | null {
+  const venueId = env?.JIUSHI_VENUE_ID?.trim() ?? "";
+  if (!venueId) {
+    warnings.push(
+      "Jiushi venue ID is not configured. Set the JIUSHI_VENUE_ID environment variable to enable Jiushi sync."
+    );
+    return null;
+  }
+
+  const allowedGroundIds =
+    env?.JIUSHI_GROUND_IDS
+      ?.split(",")
+      .map((item) => item.trim())
+      .filter(Boolean) ?? [];
+
+  return {
+    venueId,
+    allowedGroundIds,
+  };
+}
+
+async function runUSThingTimeslotSync(
   env: WorkerEnv,
   fetchImpl: typeof fetch = fetch,
   startDate?: string,
   endDate?: string
-): Promise<{
-  slots: UnifiedTimeSlot[];
-  warnings: string[];
-  startDate: string;
-  endDate: string;
-  generatedAt: Date;
-}> {
+): Promise<TimeslotSyncResult> {
   const effectiveStart = startDate ?? getTodayUTC8();
   const effectiveEnd = endDate ?? getDateDaysAhead(14);
   const warnings: string[] = [];
@@ -279,7 +325,94 @@ export async function runTimeslotSync(
     console.warn("[USThing] No slots returned in this sync");
   }
 
-  return { slots, warnings, startDate: effectiveStart, endDate: effectiveEnd, generatedAt };
+  return {
+    source: "usthing",
+    slots,
+    warnings,
+    startDate: effectiveStart,
+    endDate: effectiveEnd,
+    generatedAt,
+  };
+}
+
+async function runJiushiTimeslotSync(
+  env: WorkerEnv,
+  fetchImpl: typeof fetch = fetch,
+  startDate?: string,
+  endDate?: string
+): Promise<TimeslotSyncResult> {
+  const effectiveStart = startDate ?? getTodayUTC8();
+  const effectiveEnd = endDate ?? getDateDaysAhead(14);
+  const warnings: string[] = [];
+  const config = parseJiushiConfig(env, warnings);
+  const generatedAt = new Date();
+
+  if (!config) {
+    return {
+      source: "jiushi",
+      slots: [],
+      warnings,
+      startDate: effectiveStart,
+      endDate: effectiveEnd,
+      generatedAt,
+    };
+  }
+
+  const slots = await updateJiushiTimeSlots({
+    venueId: config.venueId,
+    allowedGroundIds: config.allowedGroundIds,
+    startDate: effectiveStart,
+    endDate: effectiveEnd,
+    fetchImpl,
+    warnings,
+  });
+
+  if (!env.JIUSHI_DB) {
+    warnings.push(
+      "Jiushi D1 binding (JIUSHI_DB) is not configured. Results cannot be persisted."
+    );
+  } else {
+    try {
+      await persistSlots(
+        env.JIUSHI_DB,
+        slots,
+        effectiveStart,
+        effectiveEnd,
+        generatedAt
+      );
+    } catch (error) {
+      console.error("Failed to persist Jiushi slot snapshot to D1", error);
+      warnings.push(
+        "Unable to persist Jiushi slot data to D1. The dashboard may serve stale results."
+      );
+    }
+  }
+
+  if (!slots.length) {
+    console.warn("[Jiushi] No slots returned in this sync");
+  }
+
+  return {
+    source: "jiushi",
+    slots,
+    warnings,
+    startDate: effectiveStart,
+    endDate: effectiveEnd,
+    generatedAt,
+  };
+}
+
+export async function runTimeslotSync(
+  source: DataSourceKey,
+  env: WorkerEnv,
+  fetchImpl: typeof fetch = fetch,
+  startDate?: string,
+  endDate?: string
+): Promise<TimeslotSyncResult> {
+  if (source === "jiushi") {
+    return runJiushiTimeslotSync(env, fetchImpl, startDate, endDate);
+  }
+  return runUSThingTimeslotSync(env, fetchImpl, startDate, endDate);
 }
 
 export default {
@@ -298,25 +431,47 @@ export default {
       return new Response("Method Not Allowed", { status: 405 });
     }
 
+    const source = normalizeDataSource(url.searchParams.get("source"));
+    const targetDb = source === "jiushi" ? env.JIUSHI_DB : env.DB;
+
     const startDate = getTodayUTC8();
     const endDate = getDateDaysAhead(14);
     const forceRefresh = url.searchParams.get("refresh") === "1";
     let warnings: string[] = [];
     let generatedAt = new Date();
 
+    if (!targetDb) {
+      warnings.push(
+        source === "jiushi"
+          ? "Jiushi database binding (JIUSHI_DB) is not available. Live results will not be cached."
+          : "Primary database binding (DB) is not available. Live results will not be cached."
+      );
+    }
+
     let { slots: dbSlots, latestUpdatedAt } = await loadSlots(
-      env.DB,
+      targetDb,
       startDate,
       endDate
     );
 
     if (dbSlots.length === 0 || forceRefresh) {
-      const syncResult = await runTimeslotSync(env, fetch, startDate, endDate);
+      const syncResult = await runTimeslotSync(
+        source,
+        env,
+        fetch,
+        startDate,
+        endDate
+      );
       warnings = warnings.concat(syncResult.warnings);
       generatedAt = syncResult.generatedAt;
-      const reload = await loadSlots(env.DB, startDate, endDate);
-      dbSlots = reload.slots;
-      latestUpdatedAt = reload.latestUpdatedAt ?? latestUpdatedAt;
+      if (targetDb) {
+        const reload = await loadSlots(targetDb, startDate, endDate);
+        dbSlots = reload.slots;
+        latestUpdatedAt = reload.latestUpdatedAt ?? latestUpdatedAt;
+      } else {
+        dbSlots = syncResult.slots;
+        latestUpdatedAt = syncResult.generatedAt.toISOString();
+      }
     }
 
     if (latestUpdatedAt) {
@@ -344,12 +499,18 @@ export default {
       baseParams.set("format", "html");
       baseParams.delete("page");
       const baseQuery = baseParams.toString();
+      const sourceParams = new URLSearchParams(baseParams);
+      sourceParams.delete("source");
+      const sourceQueryBase = sourceParams.toString();
       const html = renderSlotsTable(displaySlots, {
         generatedAt,
         page,
         pageSize: 8,
         basePath: url.pathname,
         baseQuery,
+        source,
+        availableSources: AVAILABLE_SOURCES,
+        sourceQueryBase,
         warnings,
       });
       return new Response(html, {
@@ -362,6 +523,8 @@ export default {
         count: displaySlots.length,
         startDate,
         endDate,
+        source,
+        availableSources: AVAILABLE_SOURCES,
         refreshed: forceRefresh,
         lastUpdatedAt: generatedAt.toISOString(),
         warnings,
@@ -384,9 +547,24 @@ export default {
     const endDate = getDateDaysAhead(14);
     ctx.waitUntil(
       (async () => {
-        const result = await runTimeslotSync(env, fetch, startDate, endDate);
-        if (result.warnings.length) {
-          console.warn("Scheduled sync warnings:", result.warnings);
+        for (const source of AVAILABLE_SOURCES) {
+          try {
+            const result = await runTimeslotSync(
+              source,
+              env,
+              fetch,
+              startDate,
+              endDate
+            );
+            if (result.warnings.length) {
+              console.warn(
+                `[${source}] Scheduled sync warnings:`,
+                result.warnings
+              );
+            }
+          } catch (error) {
+            console.error(`[${source}] Scheduled sync failed`, error);
+          }
         }
       })()
     );

@@ -1,4 +1,4 @@
-import { UnifiedTimeSlot } from "../types";
+import { UnifiedTimeSlot, DataSourceKey } from "../types";
 import {
   resolveFacilityName,
   listKnownFacilities,
@@ -16,9 +16,16 @@ interface RenderOptions {
   basePath?: string;
   baseQuery?: string;
   warnings?: string[];
+  source: DataSourceKey;
+  availableSources?: DataSourceKey[];
+  sourceLabels?: Partial<Record<DataSourceKey, string>>;
+  sourceQueryBase?: string;
 }
 
-const FACILITY_ORDER = listKnownFacilities().map(([id]) => id);
+const SOURCE_LABELS: Record<DataSourceKey, string> = {
+  usthing: "USThing",
+  jiushi: "Jiushi",
+};
 
 function escapeHtml(value: string): string {
   return value
@@ -63,6 +70,21 @@ export function renderSlotsTable(
     datesToDisplay.includes(slot.Date)
   );
 
+  const knownFacilities = listKnownFacilities(options.source);
+  const facilityOrder: string[] = [];
+  const facilityOrderSet = new Set<string>();
+  for (const [id] of knownFacilities) {
+    facilityOrder.push(id);
+    facilityOrderSet.add(id);
+  }
+  const orderingSource = visibleSlots.length ? visibleSlots : slots;
+  for (const slot of orderingSource) {
+    if (!facilityOrderSet.has(slot.FacilityID)) {
+      facilityOrderSet.add(slot.FacilityID);
+      facilityOrder.push(slot.FacilityID);
+    }
+  }
+
   const slotsByDateTime = new Map<string, UnifiedTimeSlot[]>();
 
   for (const slot of visibleSlots) {
@@ -100,6 +122,15 @@ export function renderSlotsTable(
     const qs = params.toString();
     return `${basePath}${qs ? `?${qs}` : ""}`;
   };
+  const sourceQueryBase = options.sourceQueryBase ?? "";
+  const makeSourceLink = (target: DataSourceKey) => {
+    const params = new URLSearchParams(sourceQueryBase);
+    params.set("format", "html");
+    params.delete("page");
+    params.set("source", target);
+    const qs = params.toString();
+    return `${basePath}${qs ? `?${qs}` : ""}`;
+  };
 
   const warnings = options.warnings ?? [];
   const tokenWarning = warnings.find((w) =>
@@ -109,13 +140,46 @@ export function renderSlotsTable(
     hour12: false,
     timeZone: "Asia/Shanghai",
   });
+  const sourceLabelsMap = options.sourceLabels ?? {};
+  const activeSourceLabel =
+    sourceLabelsMap[options.source] ??
+    SOURCE_LABELS[options.source] ??
+    options.source;
+  const availableSources =
+    options.availableSources && options.availableSources.length
+      ? options.availableSources
+      : [options.source];
+  const sourceSelector =
+    availableSources.length > 1
+      ? `<div class="mt-4 flex flex-wrap items-center gap-2 text-sm">
+          ${availableSources
+            .map((src) => {
+              const label =
+                sourceLabelsMap[src] ??
+                SOURCE_LABELS[src] ??
+                src.toUpperCase();
+              const isActive = src === options.source;
+              const href = makeSourceLink(src);
+              const baseClasses =
+                "inline-flex items-center rounded-full px-3 py-1 transition border";
+              const activeClasses =
+                "border-sky-500 bg-sky-100 text-sky-800 dark:border-sky-300 dark:bg-sky-900/40 dark:text-sky-100";
+              const inactiveClasses =
+                "border-slate-200 text-slate-600 hover:border-slate-400 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700";
+              return `<a class="${baseClasses} ${
+                isActive ? activeClasses : inactiveClasses
+              }" href="${href}">${escapeHtml(label)}</a>`;
+            })
+            .join("")}
+        </div>`
+      : "";
 
   return `<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>USThing Court Overview</title>
+    <title>${escapeHtml(activeSourceLabel)} Court Overview</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = { darkMode: "class" };
@@ -290,7 +354,7 @@ export function renderSlotsTable(
       <section class="rounded-lg bg-white p-6 shadow-sm ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 class="text-2xl font-bold text-slate-900 dark:text-slate-100">📊 USThing Timeslot Dashboard</h1>
+            <h1 class="text-2xl font-bold text-slate-900 dark:text-slate-100">📊 ${escapeHtml(activeSourceLabel)} Timeslot Dashboard</h1>
             <p class="text-sm text-slate-600 dark:text-slate-300">Live snapshot grouped by date and timeslot</p>
           </div>
           <div class="flex items-center gap-3 text-xs text-slate-600 dark:text-slate-300">
@@ -316,14 +380,16 @@ export function renderSlotsTable(
             </label>
           </div>
         </div>
+        ${sourceSelector}
         <div class="mt-4 grid gap-2 text-sm text-slate-600 dark:text-slate-300 sm:grid-cols-2">
           <p>⏱ Generated (UTC+8): <span class="font-medium text-slate-900 dark:text-slate-100">${generated}</span></p>
           <p>🧮 Total slots collected: <span class="font-medium text-slate-900 dark:text-slate-100">${slots.length}</span></p>
+          <p>📡 Data source: <span class="font-medium text-slate-900 dark:text-slate-100">${escapeHtml(activeSourceLabel)}</span></p>
         </div>
       </section>
 
       ${
-        tokenWarning
+        tokenWarning && options.source === "usthing"
           ? `<section class="rounded-lg border border-amber-300 bg-amber-50/80 p-4 text-sm text-amber-800 shadow-sm dark:border-amber-500 dark:bg-amber-900/30 dark:text-amber-200">
               <h2 class="text-base font-semibold">⚠️ JWT token maintenance required</h2>
               <p class="mt-1">
@@ -403,13 +469,13 @@ export function renderSlotsTable(
                           const entries = slotsByDateTime.get(key) ?? [];
                           const entryMap = new Map(entries.map((slot) => [slot.FacilityID, slot]));
 
-                          const badges = FACILITY_ORDER.map((facilityId) => {
+                          const badges = facilityOrder.map((facilityId) => {
                             const slot = entryMap.get(facilityId);
                             if (!slot) {
-                              return `<span class="slot-badge slot-empty"><span class="slot-label">${resolveFacilityName(facilityId)}</span></span>`;
+                              return `<span class="slot-badge slot-empty"><span class="slot-label">${resolveFacilityName(facilityId, options.source)}</span></span>`;
                             }
                             const colorClass = statusColor(slot.Status);
-                            const facilityName = resolveFacilityName(slot.FacilityID);
+                            const facilityName = resolveFacilityName(slot.FacilityID, options.source);
                             const activity = slot.ActivityName?.trim() ?? "";
                             const isClass = activity.toLowerCase().includes("class");
                             const extraClass = isClass ? " is-class" : "";
@@ -465,13 +531,13 @@ export function renderSlotsTable(
                 <div class="space-y-2">
                   ${dateSlots
                     .map(({ label, slots }) => {
-                      const badges = FACILITY_ORDER.map((facilityId) => {
+                      const badges = facilityOrder.map((facilityId) => {
                         const slot = slots.get(facilityId);
                         if (!slot) {
-                          return `<span class="slot-badge slot-empty"><span class="slot-label">${resolveFacilityName(facilityId)}</span></span>`;
+                          return `<span class="slot-badge slot-empty"><span class="slot-label">${resolveFacilityName(facilityId, options.source)}</span></span>`;
                         }
                         const colorClass = statusColor(slot.Status);
-                        const facilityName = resolveFacilityName(slot.FacilityID);
+                        const facilityName = resolveFacilityName(slot.FacilityID, options.source);
                         const activity = slot.ActivityName?.trim() ?? "";
                         const isClass = activity.toLowerCase().includes("class");
                         const extraClass = isClass ? " is-class" : "";

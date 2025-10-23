@@ -1,6 +1,8 @@
 import { UnifiedTimeSlot, AlumniTimeSlot, USThingTimeSlot } from "../types";
 import * as alumni from "../sources/alumni";
 import * as usthing from "../sources/usthing";
+import * as jiushi from "../sources/jiushi";
+import { formatAsDateUTC8 } from "../utils/time";
 
 export function convertAlumniToUnified(
   alumniSlots: AlumniTimeSlot[]
@@ -26,6 +28,31 @@ export function convertUSThingToUnified(
     Status: slot.timeslotStatus,
     ActivityName: slot.activityName?.trim() ?? "",
   }));
+}
+
+function enumerateDateRangeInclusive(
+  startDate: string,
+  endDate: string
+): string[] {
+  const start = new Date(`${startDate}T00:00:00+08:00`);
+  const end = new Date(`${endDate}T00:00:00+08:00`);
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    throw new Error(
+      `Unable to enumerate date range: invalid start (${startDate}) or end (${endDate}) date`
+    );
+  }
+
+  const results: string[] = [];
+  for (
+    let cursor = start;
+    cursor.getTime() <= end.getTime();
+    cursor = new Date(cursor.getTime() + 24 * 60 * 60 * 1000)
+  ) {
+    results.push(formatAsDateUTC8(cursor));
+  }
+
+  return results;
 }
 
 interface AlumniOptions {
@@ -149,4 +176,65 @@ export async function updateUSThingTimeSlots(
     `[USThing] Total unified slots returned: ${unified.length}`
   );
   return unified;
+}
+
+export interface JiushiOptions {
+  venueId: string;
+  startDate: string;
+  endDate: string;
+  fetchImpl?: typeof fetch;
+  allowedGroundIds?: string[];
+  warnings?: string[];
+}
+
+export async function updateJiushiTimeSlots(
+  options: JiushiOptions
+): Promise<UnifiedTimeSlot[]> {
+  const { fetchImpl = fetch, warnings, allowedGroundIds } = options;
+  const dates = enumerateDateRangeInclusive(options.startDate, options.endDate);
+  const groundsFilter = allowedGroundIds?.length
+    ? new Set(allowedGroundIds)
+    : null;
+
+  const addWarning = (message: string) => {
+    if (!warnings) {
+      return;
+    }
+    if (!warnings.includes(message)) {
+      warnings.push(message);
+    }
+  };
+
+  console.log(
+    `[Jiushi] Fetching venue ${options.venueId} for ${dates.length} day(s)`
+  );
+
+  const aggregated: UnifiedTimeSlot[] = [];
+  for (const date of dates) {
+    try {
+      const slots = await jiushi.getUnifiedSlotsForDate(
+        options.venueId,
+        date,
+        fetchImpl
+      );
+      const filtered = groundsFilter
+        ? slots.filter((slot) => groundsFilter.has(slot.FacilityID))
+        : slots;
+      console.log(`[Jiushi] ${date} returned ${filtered.length} slot(s)`);
+      aggregated.push(...filtered);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      addWarning(`Failed to fetch Jiushi slots on ${date}: ${message}`);
+      console.error(`[Jiushi] Failed to fetch slots on ${date}`, error);
+
+      if (message.includes("超过可包场的时间")) {
+        addWarning(
+          `Jiushi API booking window exceeded at ${date}; skipping later dates.`
+        );
+        break;
+      }
+    }
+  }
+
+  return aggregated;
 }

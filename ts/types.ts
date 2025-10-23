@@ -7,6 +7,8 @@ export interface UnifiedTimeSlot {
   ActivityName: string;
 }
 
+export type DataSourceKey = "usthing" | "jiushi";
+
 export interface AlumniTimeSlot {
   facility_id: string;
   date: string;
@@ -34,4 +36,9 @@ export interface USThingConfig {
   userType: string;
   facilityIDs: string[];
   bearer?: string;
+}
+
+export interface JiushiConfig {
+  venueId: string;
+  allowedGroundIds: string[];
 }

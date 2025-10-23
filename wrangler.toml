@@ -4,7 +4,7 @@ compatibility_date = "2024-11-22"
 compatibility_flags = ["nodejs_compat"]
 
 [triggers]
-crons = ["* 8-22 * * *"]
+crons = ["* 0-14 * * *"]
 
 [[kv_namespaces]]
 binding = "hkust_token"
@@ -17,6 +17,12 @@ binding = "DB"
 database_name = "hkust-badminton-slot-data"
 # Replace with your actual D1 database ID after creation
 database_id = "4cc65080-5400-44de-b74c-661320af9b7e"
+
+[[d1_databases]]
+binding = "JIUSHI_DB"
+database_name = "jiushi-badminton-slot-data"
+# Replace with your actual Jiushi D1 database ID after creation
+database_id = "f230462d-bf7f-451b-8c99-ab9e5ea0a73f"
 
 [observability.logs]
 enabled = true
@@ -32,3 +38,7 @@ USTHING_USER_TYPE = "01"
 # USTHING_BEARER = "Bearer your-jwt-token"
 # Optional: gate /admin/token updates
 # TOKEN_ADMIN_SECRET = "change-me"
+# Required to enable Jiushi sync
+JIUSHI_VENUE_ID = "27"
+# Optional: restrict Jiushi grounds
+JIUSHI_GROUND_IDS = "151,152,153"

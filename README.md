@@ -1,9 +1,10 @@
 # FBS HKUST Spider
 
-Fetch, persist, and visualise USThing badminton court availability. This repository now bundles the original Go-based CLI scanner together with the Cloudflare Worker that powers the web dashboard.
+Fetch, persist, and visualise badminton court availability from both USThing and Jiushi. This repository now bundles the original Go-based CLI scanner together with the Cloudflare Worker that powers the web dashboard.
 
-- **Live snapshot**: A Cloudflare Worker fetches slot data, stores the latest 14-day window in D1, and renders an HTML table or JSON feed.
-- **Cron refresh**: Cloudflare Scheduler triggers the worker every minute between 08:00–22:59 (UTC+8) to keep the snapshot fresh.
+- **Live snapshot**: A Cloudflare Worker fetches slot data from each provider, stores the latest 14-day window in provider-specific D1 databases, and renders an HTML table or JSON feed.
+- **Source switcher**: The dashboard supports `?source=usthing` or `?source=jiushi` (with a UI toggle) so you can compare feeds side by side.
+- **Cron refresh**: Cloudflare Scheduler triggers both providers every minute between 08:00–22:59 (UTC+8) to keep the snapshots fresh.
 - **Push (optional)**: PushDeer notifications can be enabled for new availability.
 - **Legacy tooling**: The Go modules in `internal/` continue to support local/CLI workflows and share logic with the TypeScript side.
 
@@ -37,6 +38,10 @@ npx wrangler dev --test-scheduled
 | `USTHING_FACILITY_IDS` | Comma-separated facility IDs (defaults to `2,3,4,5,79,80,100,101`). |
 | `PUSHDEER_KEYS` | Optional. Comma-separated PushDeer keys. |
 | `TOKEN_ADMIN_SECRET` | Optional. Passphrase required when updating the bearer token via `/admin/token`. |
+| `JIUSHI_VENUE_ID` | Required when enabling Jiushi sync. Venue identifier passed to the Jiushi API (e.g. `27`). |
+| `JIUSHI_GROUND_IDS` | Optional. Comma-separated Jiushi ground IDs to persist (defaults to all courts returned by the API). |
+
+Provision two D1 databases using the schema in `d1/schema.sql`: one bound to `DB` (USThing) and one to `JIUSHI_DB` (Jiushi).
 
 During local dev you can use `.dev.vars` or export variables before `wrangler dev`. For production, write secrets to the KV namespace:
 
@@ -57,10 +62,10 @@ crons = ["* 8-22 * * *"]
 
 That means Cloudflare Scheduler runs the worker once per minute from 08:00 to 22:59 (UTC+8). Every invocation:
 
-1. Calls USThing for configured facilities and date range (`today` + 14 days).
-2. Persists the snapshot into D1 (`slot_snapshot` table).
-3. Enqueues optional PushDeer notifications.
-4. When hit via HTTP, the worker renders the latest snapshot (without retrying unless `?refresh=1` is passed).
+1. Calls USThing for configured facilities and Jiushi for the configured venue.
+2. Persists each provider snapshot into its own D1 binding (`DB` for USThing, `JIUSHI_DB` for Jiushi).
+3. Enqueues optional PushDeer notifications (USThing only at the moment).
+4. When hit via HTTP, the worker renders the latest snapshot (use `?source=` to select a provider, and `?refresh=1` to force re-sync).
 
 ## Deployment
 
@@ -118,5 +123,3 @@ It shares service logic with the worker and can be extended for CLI automation o
 ## License
 
 MIT © kongdayan
-
-

@@ -23,8 +23,8 @@ interface JiushiBlockModel {
 
 interface JiushiStatusList {
   blockModel: JiushiBlockModel[];
-  startTime: number;
-  endTime: number;
+  startTime: number | string;
+  endTime: number | string;
   minHour: string;
 }
 
@@ -62,6 +62,17 @@ function generateJsSign(payload: unknown): string {
   const serialized = JSON.stringify(payload);
   const digest = md5Hex(serialized + JIUSHI_SALT);
   return toBase64(digest);
+}
+
+function coerceTimestamp(value: number | string): number {
+  if (typeof value === "number") {
+    return value;
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`Invalid Jiushi timestamp: ${value}`);
+  }
+  return parsed;
 }
 
 export async function queryVenueData(
@@ -107,9 +118,11 @@ export function responseToUnifiedSlots(
   const slots: UnifiedTimeSlot[] = [];
 
   for (const status of response.data.statusList ?? []) {
-    const date = formatAsDateUTC8(new Date(status.startTime));
-    const start = formatAsTimeUTC8(status.startTime);
-    const end = formatAsTimeUTC8(status.endTime);
+    const startMs = coerceTimestamp(status.startTime);
+    const endMs = coerceTimestamp(status.endTime);
+    const date = formatAsDateUTC8(new Date(startMs));
+    const start = formatAsTimeUTC8(startMs);
+    const end = formatAsTimeUTC8(endMs);
 
     for (const block of status.blockModel ?? []) {
       slots.push({
@@ -131,9 +144,16 @@ export async function getAvailableTimeSlots(
   targetDate: string,
   fetchImpl: typeof fetch = fetch
 ): Promise<UnifiedTimeSlot[]> {
+  const slots = await getUnifiedSlotsForDate(facilityId, targetDate, fetchImpl);
+  return slots.filter((slot) => slot.Status === "Available");
+}
+
+export async function getUnifiedSlotsForDate(
+  venueId: string,
+  targetDate: string,
+  fetchImpl: typeof fetch = fetch
+): Promise<UnifiedTimeSlot[]> {
   const bookTime = dateStringToUnixSeconds(targetDate);
-  const response = await queryVenueData(facilityId, bookTime, fetchImpl);
-  return responseToUnifiedSlots(response, facilityId).filter(
-    (slot) => slot.Status === "Available"
-  );
+  const response = await queryVenueData(venueId, bookTime, fetchImpl);
+  return responseToUnifiedSlots(response, venueId);
 }

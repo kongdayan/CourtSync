@@ -4,6 +4,7 @@ Fetch, persist, and visualise badminton court availability from both USThing and
 
 - **Live snapshot**: A Cloudflare Worker fetches slot data from each provider, stores the latest 14-day window in provider-specific D1 databases, and renders an HTML table or JSON feed.
 - **Source switcher**: The dashboard supports `?source=usthing` or `?source=jiushi` (with a UI toggle) so you can compare feeds side by side.
+- **One-click screenshots**: The Jiushi/USThing views expose a “📸 导出快照” button that captures the full grid (time axis + all slots) into a PNG via html2canvas.
 - **Cron refresh**: Cloudflare Scheduler triggers both providers every minute between 08:00–22:59 (UTC+8) to keep the snapshots fresh.
 - **Push (optional)**: PushDeer notifications can be enabled for new availability.
 - **Legacy tooling**: The Go modules in `internal/` continue to support local/CLI workflows and share logic with the TypeScript side.
@@ -66,7 +67,7 @@ That means Cloudflare Scheduler runs the worker once per minute from 08:00 to 22
 1. Calls USThing for configured facilities and Jiushi for the configured venue.
 2. Persists each provider snapshot into its own D1 binding (`DB` for USThing, `JIUSHI_DB` for Jiushi).
 3. Enqueues optional PushDeer notifications (USThing only at the moment).
-4. When hit via HTTP, the worker renders the latest snapshot (use `?source=` to select a provider, and `?refresh=1` to force re-sync).
+4. When hit via HTTP, the worker renders the latest snapshot (use `?source=` to select a provider, `?refresh=1` to force re-sync, and the on-page button to export a PNG snapshot).
 
 ## Deployment
 

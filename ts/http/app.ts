@@ -4,6 +4,7 @@ import { createAuth } from "../auth/config";
 import { parseAdminEmails } from "../auth/admin-emails";
 import { healthRoutes } from "./routes/health";
 import { meRoutes } from "./routes/me";
+import { slotsRoutes } from "./routes/slots";
 import {
   createSessionMiddleware,
   type AuthVariables,
@@ -80,6 +81,7 @@ export function createApp(deps?: AppDependencies) {
       return createAuth(c.env).handler(c.req.raw);
     })
     .route("/", healthRoutes)
+    .route("/", slotsRoutes)
     .route("/", authenticated)
     .notFound((c) => c.json({ error: "not_found" }, 404));
 }

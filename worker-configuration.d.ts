@@ -20,10 +20,8 @@ interface __BaseEnv_Env {
 	GOOGLE_CLIENT_ID: string;
 	GOOGLE_CLIENT_SECRET: string;
 	CHANNEL_ENCRYPTION_KEYS: string;
-	ADMIN_PUSHDEER_KEYS: string;
 	USTHING_PASSWORD: string;
 	USTHING_BEARER: string;
-	TOKEN_ADMIN_SECRET: string;
 	JIUSHI_PROXY_URL: string;
 	JIUSHI_PROXY_TOKEN: string;
 	JIUSHI_COOKIE: string;
@@ -39,7 +37,7 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "APP_BASE_URL" | "DEFAULT_RULE_LIMIT" | "ADMIN_RULE_LIMIT" | "USTHING_USERNAME" | "USTHING_USER_TYPE" | "JIUSHI_VENUE_ID" | "JIUSHI_MAX_DAYS" | "ADMIN_EMAILS" | "BETTER_AUTH_SECRET" | "GOOGLE_CLIENT_ID" | "GOOGLE_CLIENT_SECRET" | "CHANNEL_ENCRYPTION_KEYS" | "ADMIN_PUSHDEER_KEYS" | "USTHING_PASSWORD" | "USTHING_BEARER" | "TOKEN_ADMIN_SECRET" | "JIUSHI_PROXY_URL" | "JIUSHI_PROXY_TOKEN" | "JIUSHI_COOKIE">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "APP_BASE_URL" | "DEFAULT_RULE_LIMIT" | "ADMIN_RULE_LIMIT" | "USTHING_USERNAME" | "USTHING_USER_TYPE" | "JIUSHI_VENUE_ID" | "JIUSHI_MAX_DAYS" | "ADMIN_EMAILS" | "BETTER_AUTH_SECRET" | "GOOGLE_CLIENT_ID" | "GOOGLE_CLIENT_SECRET" | "CHANNEL_ENCRYPTION_KEYS" | "USTHING_PASSWORD" | "USTHING_BEARER" | "JIUSHI_PROXY_URL" | "JIUSHI_PROXY_TOKEN" | "JIUSHI_COOKIE">> {}
 }
 
 // Begin runtime types

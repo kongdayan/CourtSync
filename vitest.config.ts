@@ -21,7 +21,6 @@ export default defineConfig(async () => {
             GOOGLE_CLIENT_ID: "test-google-client-id",
             GOOGLE_CLIENT_SECRET: "test-google-client-secret",
             CHANNEL_ENCRYPTION_KEYS: "test-channel-encryption-key",
-            ADMIN_PUSHDEER_KEYS: "test-admin-pushdeer-key",
             TEST_MIGRATIONS: migrations,
           },
         },

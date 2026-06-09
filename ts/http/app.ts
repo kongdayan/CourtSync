@@ -4,6 +4,7 @@ import { createAuth } from "../auth/config";
 import { parseAdminEmails } from "../auth/admin-emails";
 import { healthRoutes } from "./routes/health";
 import { meRoutes } from "./routes/me";
+import { rulesRoutes } from "./routes/rules";
 import { slotsRoutes } from "./routes/slots";
 import {
   createSessionMiddleware,
@@ -71,6 +72,7 @@ export function createApp(deps?: AppDependencies) {
     .route("/", meRoutes)
     .use(activeUserMiddleware)
     .use(sameOriginJsonMiddleware)
+    .route("/", rulesRoutes)
     .get("/protected", (c) => c.json({ ok: true }));
 
   return new Hono<{ Bindings: Env; Variables: AuthVariables }>()

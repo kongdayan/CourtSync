@@ -73,6 +73,11 @@ export function createApp(deps?: AppDependencies) {
 
   const app = new Hono<{ Bindings: Env; Variables: AuthVariables }>()
     .basePath("/api")
+    // Better Auth — mounted as sub-app for proper route matching
+    .on(["GET", "POST"], "/auth/*", async (c) => {
+      const auth = createAuth(c.env);
+      return auth.handler(c.req.raw);
+    })
     .route("/", healthRoutes)
     .route("/", slotsRoutes)
     .route("/", authenticated)

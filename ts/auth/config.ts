@@ -3,7 +3,7 @@ import { betterAuth } from "better-auth";
 export function createAuth(env: Env) {
   return betterAuth({
     appName: "CourtSync",
-    baseURL: `${env.APP_BASE_URL}/api/auth`,
+    baseURL: env.APP_BASE_URL,
     secret: env.BETTER_AUTH_SECRET,
     database: env.APP_DB,
     socialProviders: {

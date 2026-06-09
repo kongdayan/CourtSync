@@ -83,15 +83,16 @@ async function acquireAcwTc(fetchImpl: typeof fetch): Promise<string> {
     body: "{}",
   });
 
-  // 从 Set-Cookie 提取 acw_tc
-  const setCookie = response.headers.get("set-cookie");
-  if (!setCookie) {
-    throw new Error("WAF did not return Set-Cookie header");
+  // 从 Set-Cookie 提取 acw_tc（Worker 中必须用 getSetCookie）
+  const setCookieAll = response.headers.getSetCookie?.()
+    ?? [response.headers.get("set-cookie")].filter(Boolean);
+  let match: RegExpMatchArray | null = null;
+  for (const sc of setCookieAll) {
+    match = sc.match(/acw_tc=([^;]+)/);
+    if (match) break;
   }
-
-  const match = setCookie.match(/acw_tc=([^;]+)/);
   if (!match) {
-    throw new Error("acw_tc not found in Set-Cookie header");
+    throw new Error("acw_tc not found in Set-Cookie headers");
   }
 
   const cookie = `acw_tc=${match[1]}`;
@@ -139,8 +140,8 @@ function formatFetchError(status: number, body: string): string {
 
 interface QueryOptions {
   fetchImpl?: typeof fetch;
-  /** 外部提供的 js_sign（可选，优先级高于自动计算） */
-  jsSign?: string;
+  /** Proxy URL to bypass Cloudflare Worker IP blocking (e.g. https://proxy.example.com) */
+  proxyUrl?: string;
 }
 
 export async function queryVenueData(
@@ -149,12 +150,15 @@ export async function queryVenueData(
   fetchImpl: typeof fetch = fetch,
   options: QueryOptions = {}
 ): Promise<JiushiResponse> {
+  const { proxyUrl } = options;
   const payload = {
     venueId,
     bookTime: bookTimeSeconds * 1000,
   };
 
-  const jsSign = options.jsSign ?? generateJsSign(payload);
+  const jsSign = generateJsSign(payload);
+  // 如果有代理，请求走代理；cookie 由代理侧自动处理
+  const apiUrl = proxyUrl ?? JIUSHI_API;
 
   const makeRequest = async (cookie: string) => {
     const headers: HeaderMap = {
@@ -162,7 +166,7 @@ export async function queryVenueData(
       cookie,
       js_sign: jsSign,
     };
-    return fetchImpl(JIUSHI_API, {
+    return fetchImpl(apiUrl, {
       method: "POST",
       headers,
       body: JSON.stringify(payload),
@@ -251,9 +255,10 @@ export async function getAvailableTimeSlots(
 export async function getUnifiedSlotsForDate(
   venueId: string,
   targetDate: string,
-  fetchImpl: typeof fetch = fetch
+  fetchImpl: typeof fetch = fetch,
+  options: { proxyUrl?: string } = {}
 ): Promise<UnifiedTimeSlot[]> {
   const bookTime = dateStringToUnixSeconds(targetDate);
-  const response = await queryVenueData(venueId, bookTime, fetchImpl);
+  const response = await queryVenueData(venueId, bookTime, fetchImpl, options);
   return responseToUnifiedSlots(response, venueId);
 }

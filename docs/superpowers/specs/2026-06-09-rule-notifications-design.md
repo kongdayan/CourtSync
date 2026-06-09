@@ -156,7 +156,7 @@ If an upstream source fails, its current match states are unchanged. The run is 
 Each five-minute scheduled invocation creates one `sync_run` ID and performs these steps:
 
 1. Synchronize each configured source independently.
-2. Persist successful snapshots to the source's existing D1 database.
+2. Persist successful snapshots to the source's existing D1 database. Upsert every returned row with the current sync timestamp, then delete rows inside the successful date range whose timestamp is not current so stale availability cannot survive a complete sync.
 3. Record source success or failure in `APP_DB`.
 4. Load all active users and enabled rules for successful sources in one indexed query.
 5. Load the required snapshot ranges and build in-memory indexes by source, date, and start time.
@@ -253,7 +253,7 @@ The API validates facility IDs against the selected source's catalog and stores 
 
 The first release enforces one row per `(user_id, provider)`, which means one personal PushDeer key per user. The table shape permits multiple provider types later.
 
-`CHANNEL_ENCRYPTION_KEY` is a base64-encoded 256-bit Cloudflare Secret. The Worker derives separate encryption and fingerprint subkeys with HKDF. Every encrypted value uses a fresh cryptographically random AES-GCM IV. The complete key never appears in API responses or logs.
+`CHANNEL_ENCRYPTION_KEYS` is a Cloudflare Secret containing a small versioned key ring with an active key ID and base64-encoded 256-bit keys. The ciphertext records its key ID. The Worker derives separate encryption and fingerprint subkeys with HKDF. Every encrypted value uses a fresh cryptographically random AES-GCM IV. Rotation adds a new active key while retaining old keys for decryption, re-encrypts stored channels, then removes retired keys. Complete keys never appear in API responses or logs.
 
 ### `rule_match_state`
 
@@ -352,7 +352,8 @@ For a successfully synchronized source:
 - Upsert all fingerprints seen in the current run as active.
 - Mark previously active fingerprints for evaluated rules inactive when they were not seen.
 - A new fingerprint starts at notification count zero.
-- Existing fingerprints retain their count and notification timestamp.
+- Fingerprints that remained active retain their count and notification timestamp.
+- A previously inactive fingerprint that reappears is a new match event: reset its notification count to zero, clear its last notification timestamp, and set a new first-seen timestamp.
 
 For a failed source, perform no reconciliation.
 
@@ -486,7 +487,7 @@ Cloudflare Secrets:
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
 - `ADMIN_EMAILS`
-- `CHANNEL_ENCRYPTION_KEY`
+- `CHANNEL_ENCRYPTION_KEYS`
 - `ADMIN_PUSHDEER_KEY`
 - Existing sensitive USThing and Jiushi credentials and proxy tokens
 

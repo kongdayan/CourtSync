@@ -37,35 +37,41 @@ interface SlotsResponse {
 const PAGE_SIZE = 8;
 
 // -- Design tokens: status-aware pill classes --
+function isAvailable(s: string) { return s === "available"; }
+function isOccupied(s: string) { return s === "reserved" || s === "not available" || s === "unavailable"; }
+function isMaintenance(s: string) { return s === "maintenance" || s === "cleaning"; }
+
+function norm(s: string) { return s.trim().toLowerCase(); }
+
 function statusPill(status: string): string {
-  const s = status.trim().toLowerCase();
-  if (s === "available") return "bg-emerald-100 text-emerald-700 border-emerald-200";
-  if (s === "reserved") return "bg-rose-100 text-rose-700 border-rose-200";
-  if (s === "maintenance" || s === "cleaning") return "bg-amber-100 text-amber-700 border-amber-200";
+  const s = norm(status);
+  if (isAvailable(s)) return "bg-emerald-100 text-emerald-700 border-emerald-200";
+  if (isOccupied(s)) return "bg-slate-200 text-slate-600 border-slate-300 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600";
+  if (isMaintenance(s)) return "bg-amber-100 text-amber-700 border-amber-200";
   return "bg-slate-100 text-slate-600 border-slate-200";
 }
 
 function statusLabel(status: string): string {
-  const s = status.trim().toLowerCase();
-  if (s === "available") return "空闲";
-  if (s === "reserved") return "已预约";
-  if (s === "maintenance" || s === "cleaning") return "维护";
+  const s = norm(status);
+  if (isAvailable(s)) return "空闲";
+  if (isOccupied(s)) return "已占用";
+  if (isMaintenance(s)) return "维护";
   return status;
 }
 
 function statusDot(status: string): string {
-  const s = status.trim().toLowerCase();
-  if (s === "available") return "bg-emerald-500";
-  if (s === "reserved") return "bg-rose-500";
-  if (s === "maintenance" || s === "cleaning") return "bg-amber-500";
+  const s = norm(status);
+  if (isAvailable(s)) return "bg-emerald-500";
+  if (isOccupied(s)) return "bg-slate-400 dark:bg-slate-500";
+  if (isMaintenance(s)) return "bg-amber-500";
   return "bg-slate-400";
 }
 
 function statusRect(status: string): string {
-  const s = status.trim().toLowerCase();
-  if (s === "available") return "bg-emerald-400 dark:bg-emerald-500";
-  if (s === "reserved") return "bg-rose-400 dark:bg-rose-500";
-  if (s === "maintenance" || s === "cleaning") return "bg-amber-400 dark:bg-amber-500";
+  const s = norm(status);
+  if (isAvailable(s)) return "bg-emerald-400 dark:bg-emerald-500";
+  if (isOccupied(s)) return "bg-slate-400 dark:bg-slate-500";
+  if (isMaintenance(s)) return "bg-amber-400 dark:bg-amber-500";
   return "bg-slate-300 dark:bg-slate-600";
 }
 
@@ -378,7 +384,7 @@ export function DashboardPage() {
               <span className="font-medium text-slate-600 dark:text-slate-300">图例</span>
               {[
                 { status: "Available", label: "空闲", dot: "bg-emerald-500", pill: "bg-emerald-100 text-emerald-700 border-emerald-200" },
-                { status: "Reserved", label: "已预约", dot: "bg-rose-500", pill: "bg-rose-100 text-rose-700 border-rose-200" },
+                { status: "Reserved", label: "已占用", dot: "bg-slate-400 dark:bg-slate-500", pill: "bg-slate-200 text-slate-600 border-slate-300 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600" },
                 { status: "Maintenance", label: "维护", dot: "bg-amber-500", pill: "bg-amber-100 text-amber-700 border-amber-200" },
               ].map((item) => (
                 <span key={item.status} className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 ${item.pill}`}>

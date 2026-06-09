@@ -18,7 +18,9 @@ declare global {
   interface Env {
     USTHING_UST_ID?: string;
     USTHING_FACILITY_IDS?: string;
+    USTHING_BEARER?: string;
     JIUSHI_GROUND_IDS?: string;
+    JIUSHI_COOKIE?: string;
   }
 }
 

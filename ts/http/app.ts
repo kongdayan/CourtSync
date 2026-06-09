@@ -89,10 +89,15 @@ export function createApp(deps?: AppDependencies) {
 
   return new Hono<{ Bindings: Env; Variables: AuthVariables }>()
     .basePath("/api")
-    // Better Auth handles /api/auth/* — mounted before any other middleware so
+    // Better Auth handles /api/auth/** — mounted before any other middleware so
     // that the library owns its own callbacks and form content types.
-    .on(["GET", "POST"], "/auth/*", (c) => {
-      return createAuth(c.env).handler(c.req.raw);
+    .all("/auth/:path{.+}", async (c) => {
+      const auth = createAuth(c.env);
+      return auth.handler(c.req.raw);
+    })
+    .all("/auth", async (c) => {
+      const auth = createAuth(c.env);
+      return auth.handler(c.req.raw);
     })
     .route("/", healthRoutes)
     .route("/", slotsRoutes)

@@ -14,3 +14,4 @@ node_modules/
 
 # Local environment overrides
 .dev.vars
+courtsync

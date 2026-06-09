@@ -4,7 +4,7 @@ compatibility_date = "2024-11-22"
 compatibility_flags = ["nodejs_compat"]
 
 [triggers]
-crons = ["* 0-14 * * *"]
+crons = ["*/5 0-14 * * *"]
 
 [[kv_namespaces]]
 binding = "hkust_token"
@@ -46,6 +46,4 @@ JIUSHI_VENUE_ID = "27"
 # JIUSHI_GROUND_IDS = "151,152,153"
 # Optional: cap Jiushi fetch days (default 9)
 JIUSHI_MAX_DAYS = "9"
-# Optional: Proxy to bypass Jiushi WAF for Cloudflare Workers.
-# The WAF blocks Cloudflare IP ranges. Route through a non-Cloudflare server.
-# JIUSHI_PROXY_URL = "https://your-proxy.example.com"
+# JIUSHI_PROXY_URL set via wrangler secret

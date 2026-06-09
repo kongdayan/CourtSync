@@ -65,5 +65,6 @@ export interface JiushiConfig {
   allowedGroundIds: string[];
   maxDays: number;
   proxyUrl?: string;
+  proxyToken?: string;
   cookie?: string;
 }

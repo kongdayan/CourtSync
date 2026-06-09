@@ -32,8 +32,8 @@ export interface WorkerEnv {
   JIUSHI_VENUE_ID?: string;
   JIUSHI_GROUND_IDS?: string;
   JIUSHI_MAX_DAYS?: string;
-  /** Proxy URL to bypass Alibaba Cloud ESA WAF (e.g. https://your-proxy.example.com) */
   JIUSHI_PROXY_URL?: string;
+  JIUSHI_PROXY_TOKEN?: string;
   JIUSHI_COOKIE?: string;
 }
 
@@ -287,6 +287,7 @@ function parseJiushiConfig(
     allowedGroundIds,
     maxDays,
     proxyUrl: env?.JIUSHI_PROXY_URL?.trim() || undefined,
+    proxyToken: env?.JIUSHI_PROXY_TOKEN?.trim() || undefined,
     cookie: env?.JIUSHI_COOKIE?.trim() || undefined,
   };
 }
@@ -402,6 +403,7 @@ async function runJiushiTimeslotSync(
     warnings,
     maxDays: config.maxDays,
     proxyUrl: config.proxyUrl,
+    proxyToken: config.proxyToken,
   });
 
   if (!env.JIUSHI_DB) {

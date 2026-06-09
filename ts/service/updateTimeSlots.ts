@@ -186,14 +186,14 @@ export interface JiushiOptions {
   allowedGroundIds?: string[];
   warnings?: string[];
   maxDays?: number;
-  /** Proxy URL for bypassing WAF (e.g. Cloudflare Worker → residential proxy → Jiushi) */
   proxyUrl?: string;
+  proxyToken?: string;
 }
 
 export async function updateJiushiTimeSlots(
   options: JiushiOptions
 ): Promise<UnifiedTimeSlot[]> {
-  const { fetchImpl = fetch, warnings, allowedGroundIds, proxyUrl } = options;
+  const { fetchImpl = fetch, warnings, allowedGroundIds, proxyUrl, proxyToken } = options;
   const dates = enumerateDateRangeInclusive(options.startDate, options.endDate);
   const boundedDates = options.maxDays
     ? dates.slice(0, Math.max(1, options.maxDays))
@@ -222,7 +222,7 @@ export async function updateJiushiTimeSlots(
         options.venueId,
         date,
         fetchImpl,
-        { proxyUrl }
+        { proxyUrl, proxyToken }
       );
       const filtered = groundsFilter
         ? slots.filter((slot) => groundsFilter.has(slot.FacilityID))

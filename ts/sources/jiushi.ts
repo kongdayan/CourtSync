@@ -140,8 +140,8 @@ function formatFetchError(status: number, body: string): string {
 
 interface QueryOptions {
   fetchImpl?: typeof fetch;
-  /** Proxy URL to bypass Cloudflare Worker IP blocking (e.g. https://proxy.example.com) */
   proxyUrl?: string;
+  proxyToken?: string;
 }
 
 export async function queryVenueData(
@@ -150,15 +150,36 @@ export async function queryVenueData(
   fetchImpl: typeof fetch = fetch,
   options: QueryOptions = {}
 ): Promise<JiushiResponse> {
-  const { proxyUrl } = options;
+  const { proxyUrl, proxyToken } = options;
   const payload = {
     venueId,
     bookTime: bookTimeSeconds * 1000,
   };
 
+  // 代理模式：请求直接转发到代理，由代理处理 WAF cookie + 签名
+  if (proxyUrl) {
+    const headers: HeaderMap = { "Content-Type": "application/json" };
+    if (proxyToken) {
+      headers.Authorization = `Bearer ${proxyToken}`;
+    }
+    const resp = await fetchImpl(proxyUrl, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload),
+    });
+    if (!resp.ok) {
+      const text = await resp.text();
+      throw new Error(formatFetchError(resp.status, text));
+    }
+    const data = (await resp.json()) as JiushiResponse;
+    if (data.rtnCode !== "10000") {
+      throw new Error(`Jiushi API error: ${data.rtnMessage ?? "unknown"}`);
+    }
+    return data;
+  }
+
+  // 直连模式：自行获取 WAF cookie + 签名
   const jsSign = generateJsSign(payload);
-  // 如果有代理，请求走代理；cookie 由代理侧自动处理
-  const apiUrl = proxyUrl ?? JIUSHI_API;
 
   const makeRequest = async (cookie: string) => {
     const headers: HeaderMap = {
@@ -166,25 +187,22 @@ export async function queryVenueData(
       cookie,
       js_sign: jsSign,
     };
-    return fetchImpl(apiUrl, {
+    return fetchImpl(JIUSHI_API, {
       method: "POST",
       headers,
       body: JSON.stringify(payload),
     });
   };
 
-  // 尝试 1：用已缓存的 cookie
   let cookie: string;
   try {
     cookie = await acquireAcwTc(fetchImpl);
   } catch {
-    // 预热失败（不太可能但兜底），直接发不带 cookie 的请求看看
     cookie = "";
   }
 
   let response = await makeRequest(cookie);
 
-  // 如果被 WAF 拦截（403），刷新 cookie 重试一次
   if (response.status === 403) {
     const text = await response.text();
     if (text.includes("Denied by http_custom")) {
@@ -207,7 +225,7 @@ export async function queryVenueData(
   const data = (await response.json()) as JiushiResponse;
 
   if (data.rtnCode !== "10000") {
-    throw new Error(`API error: ${data.rtnMessage ?? "unknown error"}`);
+    throw new Error(`Jiushi API error: ${data.rtnMessage ?? "unknown"}`);
   }
 
   return data;
@@ -256,7 +274,7 @@ export async function getUnifiedSlotsForDate(
   venueId: string,
   targetDate: string,
   fetchImpl: typeof fetch = fetch,
-  options: { proxyUrl?: string } = {}
+  options: { proxyUrl?: string; proxyToken?: string } = {}
 ): Promise<UnifiedTimeSlot[]> {
   const bookTime = dateStringToUnixSeconds(targetDate);
   const response = await queryVenueData(venueId, bookTime, fetchImpl, options);

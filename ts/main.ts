@@ -12,6 +12,7 @@ export default {
     const url = new URL(request.url);
 
     // Handle Better Auth /api/auth/** at the Worker level.
+    // baseURL is set to APP_BASE_URL/api/auth so basePath strips correctly.
     if (url.pathname.startsWith("/api/auth")) {
       try {
         const auth = createAuth(env);

@@ -323,36 +323,19 @@ export function DashboardPage() {
                                   : `border-slate-100 ${hasContent ? "bg-white" : "bg-slate-50/60"}`}`}
                             >
                               {compact ? (
-                                source === "jiushi" ? (
-                                  <div className="grid grid-cols-7 gap-0.5">
+                                  <div className={`grid gap-0.5 ${source === "jiushi" ? "grid-cols-7" : "grid-cols-4"}`}>
                                     {facilityOrder.map((fid) => {
                                       const s = cellSlots.find((cs: Slot) => cs.FacilityID === fid);
-                                      if (!s) return <div key={fid} className="text-[8px] leading-none invisible select-none">-</div>;
+                                      if (!s) return <div key={fid} className="invisible select-none" />;
                                       return (
                                         <span
                                           key={fid}
-                                          className={`inline-flex items-center justify-center rounded border px-0.5 py-0.5 text-[8px] font-medium leading-none ${statusPill(s.Status)}`}
+                                          className={`mx-auto h-2.5 w-2.5 rounded-full border ${statusDot(s.Status)}`}
                                           title={`${resolveFacilityName(fid, sourceKey)}: ${statusLabel(s.Status)}`}
-                                        >
-                                          {resolveFacilityName(fid, sourceKey)}
-                                        </span>
+                                        />
                                       );
                                     })}
                                   </div>
-                                ) : (
-                                  <div className="flex flex-wrap justify-center gap-1">
-                                    {cellSlots.map((s: Slot) => (
-                                      <span
-                                        key={s.FacilityID}
-                                        className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium leading-none ${statusPill(s.Status)}`}
-                                        title={`${resolveFacilityName(s.FacilityID, sourceKey)}: ${statusLabel(s.Status)}`}
-                                      >
-                                        <span className={`h-1.5 w-1.5 rounded-full ${statusDot(s.Status)}`} />
-                                        {resolveFacilityName(s.FacilityID, sourceKey)}
-                                      </span>
-                                    ))}
-                                  </div>
-                                )
                               ) : (
                                 <div className="flex flex-col gap-0.5">
                                   {facilityOrder.map((fid) => {

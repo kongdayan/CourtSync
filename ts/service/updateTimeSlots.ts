@@ -186,12 +186,14 @@ export interface JiushiOptions {
   allowedGroundIds?: string[];
   warnings?: string[];
   maxDays?: number;
+  /** Proxy URL for bypassing WAF (e.g. Cloudflare Worker → residential proxy → Jiushi) */
+  proxyUrl?: string;
 }
 
 export async function updateJiushiTimeSlots(
   options: JiushiOptions
 ): Promise<UnifiedTimeSlot[]> {
-  const { fetchImpl = fetch, warnings, allowedGroundIds } = options;
+  const { fetchImpl = fetch, warnings, allowedGroundIds, proxyUrl } = options;
   const dates = enumerateDateRangeInclusive(options.startDate, options.endDate);
   const boundedDates = options.maxDays
     ? dates.slice(0, Math.max(1, options.maxDays))
@@ -210,7 +212,7 @@ export async function updateJiushiTimeSlots(
   };
 
   console.log(
-    `[Jiushi] Fetching venue ${options.venueId} for ${boundedDates.length} day(s)`
+    `[Jiushi] Fetching venue ${options.venueId} for ${boundedDates.length} day(s)${proxyUrl ? ` via proxy ${proxyUrl}` : ""}`
   );
 
   const aggregated: UnifiedTimeSlot[] = [];
@@ -219,7 +221,8 @@ export async function updateJiushiTimeSlots(
       const slots = await jiushi.getUnifiedSlotsForDate(
         options.venueId,
         date,
-        fetchImpl
+        fetchImpl,
+        { proxyUrl }
       );
       const filtered = groundsFilter
         ? slots.filter((slot) => groundsFilter.has(slot.FacilityID))
@@ -228,6 +231,11 @@ export async function updateJiushiTimeSlots(
       aggregated.push(...filtered);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      // WAF 拦截不逐天重试
+      if (message.includes("Alibaba Cloud ESA WAF")) {
+        addWarning(`Jiushi API blocked by WAF: ${message}`);
+        break;
+      }
       addWarning(`Failed to fetch Jiushi slots on ${date}: ${message}`);
       console.error(`[Jiushi] Failed to fetch slots on ${date}`, error);
 

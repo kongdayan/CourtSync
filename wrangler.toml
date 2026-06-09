@@ -46,3 +46,7 @@ JIUSHI_VENUE_ID = "27"
 # JIUSHI_GROUND_IDS = "151,152,153"
 # Optional: cap Jiushi fetch days (default 9)
 JIUSHI_MAX_DAYS = "9"
+# Optional: Proxy URL to bypass Alibaba Cloud ESA WAF for Jiushi API
+# JIUSHI_PROXY_URL = "https://your-proxy.example.com"
+# Optional: Fresh anti-bot cookies from WeChat session (rotate when 403 occurs)
+# JIUSHI_COOKIE = "ssxmod_itna3=...; acw_tc=..."

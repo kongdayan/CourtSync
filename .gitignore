@@ -8,11 +8,15 @@ res
 
 # Node / Wrangler artifacts
 node_modules/
+dist/
 .wrangler/
 .wrangler-logs/
 .npm/
+.superpowers/
+.worktrees/
 
 # Local environment overrides
 .dev.vars
+worker-configuration.d.ts
 courtsync
 jiushi-proxy

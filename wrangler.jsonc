@@ -1,0 +1,85 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "courtsync",
+  "main": "ts/main.ts",
+  "compatibility_date": "2026-06-09",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./dist/client",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  },
+  "triggers": {
+    "crons": ["*/5 0-14 * * *"]
+  },
+  "kv_namespaces": [
+    {
+      "binding": "hkust_token",
+      "id": "e73e6d33bad345538d7b6142c6b0c230",
+      "preview_id": "bed13acf84de498db5695ac4bfcdf7a2"
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "hkust-badminton-slot-data",
+      "database_id": "4cc65080-5400-44de-b74c-661320af9b7e"
+    },
+    {
+      "binding": "JIUSHI_DB",
+      "database_name": "jiushi-badminton-slot-data",
+      "database_id": "f230462d-bf7f-451b-8c99-ab9e5ea0a73f"
+    },
+    {
+      "binding": "APP_DB",
+      "database_name": "courtsync-app-data",
+      "database_id": "88db7d12-1159-46fb-b1fb-a23234365c89",
+      "migrations_dir": "d1/migrations"
+    }
+  ],
+  "queues": {
+    "producers": [
+      { "binding": "NOTIFICATION_QUEUE", "queue": "courtsync-notifications" }
+    ],
+    "consumers": [
+      {
+        "queue": "courtsync-notifications",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 3,
+        "dead_letter_queue": "courtsync-notifications-dlq"
+      }
+    ]
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": true
+    }
+  },
+  "vars": {
+    "APP_BASE_URL": "https://sports.hunao.online",
+    "DEFAULT_RULE_LIMIT": 2,
+    "ADMIN_RULE_LIMIT": 20,
+    "USTHING_USERNAME": "yanag@connect.ust.hk",
+    "USTHING_USER_TYPE": "01",
+    "JIUSHI_VENUE_ID": "27",
+    "JIUSHI_MAX_DAYS": "9"
+  },
+  "secrets": {
+    "required": [
+      "ADMIN_EMAILS",
+      "BETTER_AUTH_SECRET",
+      "GOOGLE_CLIENT_ID",
+      "GOOGLE_CLIENT_SECRET",
+      "CHANNEL_ENCRYPTION_KEYS",
+      "USTHING_PASSWORD",
+      "JIUSHI_PROXY_URL",
+      "JIUSHI_PROXY_TOKEN",
+      "ADMIN_PUSHDEER_KEY"
+    ]
+  }
+}

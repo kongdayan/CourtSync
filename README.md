@@ -88,13 +88,13 @@ Fully automated: the client acquires Alibaba Cloud ESA WAF cookies (`acw_tc`) vi
 
 System returns `errorCode: "03"` when closed (night hours ~22:00–08:00 HKT).
 
-### Jiushi (WeChat Mini Program API)
+### Jiushi
 
 | Endpoint | Method | Description |
 | --- | --- | --- |
 | `/jiushi-core/venue/getVenueGround` | POST | Query venue courts. Body: `venueId`, `bookTime` (ms). |
 
-Requires `acw_tc` WAF cookie + `js_sign` header. Both handled automatically.
+WAF cookie + request signing handled automatically.
 
 ## Deployment
 

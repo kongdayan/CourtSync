@@ -34,7 +34,6 @@ export interface WorkerEnv {
   JIUSHI_MAX_DAYS?: string;
   /** Proxy URL to bypass Alibaba Cloud ESA WAF (e.g. https://your-proxy.example.com) */
   JIUSHI_PROXY_URL?: string;
-  /** Fresh anti-bot cookies from a real WeChat session (rotates periodically) */
   JIUSHI_COOKIE?: string;
 }
 

@@ -33,13 +33,13 @@ Multi-source badminton court availability tracker with Cloudflare Worker + Go CL
 
 Azure AD tenant: `c917f3e2-9322-4926-9bb3-daca730413ca` (HKUST). Token endpoint: `login.microsoftonline.com/{tenant}/oauth2/v2.0/token`.
 
-### Jiushi (WeChat Mini Program API)
+### Jiushi
 
 | Component | Detail |
 | --- | --- |
 | Endpoint | `POST jsapp.jussyun.com/jiushi-core/venue/getVenueGround` |
 | WAF | Alibaba Cloud ESA. `acw_tc` cookie acquired via warmup request (3600s TTL). |
-| Signing | `js_sign = base64(md5(JSON(payload) + salt))`, salt: `527093093C418483029EEC61F70E9DD1` |
+| Signing | `js_sign = base64(md5(JSON(payload) + salt))` |
 | WAF bypass | Cloudflare Worker IPs blocked at edge. Use `JIUSHI_PROXY_URL` or Go CLI locally. |
 
 ## Worker Behaviour

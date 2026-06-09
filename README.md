@@ -9,7 +9,7 @@ Multi-source badminton court availability tracker with web dashboard, push notif
 - **PushDeer notifications**: Optional push alerts when courts become available.
 - **Go CLI**: Local runner for ad-hoc scans or environments where Cloudflare Workers are blocked by venue WAFs.
 
-GitHub: <https://github.com/kongdayan/CourtSync>
+Live: <https://sport.badminton.hunao.online/> · GitHub: <https://github.com/kongdayan/CourtSync>
 
 ## Directory Map
 
@@ -21,7 +21,7 @@ GitHub: <https://github.com/kongdayan/CourtSync>
 ## Quick Start
 
 ```bash
-git clone https://github.com/kongdayan/CourtSync
+git clone https://github.com/kongdayan/CourtSync.git
 cd CourtSync
 npm install
 

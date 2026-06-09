@@ -7,7 +7,7 @@ export interface UnifiedTimeSlot {
   ActivityName: string;
 }
 
-export type DataSourceKey = "usthing" | "jiushi";
+export type { DataSourceKey } from "./shared/sources";
 
 export interface AlumniTimeSlot {
   facility_id: string;

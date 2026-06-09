@@ -552,8 +552,12 @@ export default {
         sourceQueryBase,
         warnings,
       });
+      const cacheTTL = forceRefresh ? "no-cache" : "public, max-age=120";
       return new Response(html, {
-        headers: { "Content-Type": "text/html; charset=utf-8" },
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": cacheTTL,
+        },
       });
     }
 
@@ -573,7 +577,10 @@ export default {
       2
     );
     return new Response(body, {
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": forceRefresh ? "no-cache" : "public, max-age=120",
+      },
     });
   },
 

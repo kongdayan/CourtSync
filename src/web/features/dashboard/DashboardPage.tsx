@@ -61,6 +61,14 @@ function statusDot(status: string): string {
   return "bg-slate-400";
 }
 
+function statusRect(status: string): string {
+  const s = status.trim().toLowerCase();
+  if (s === "available") return "bg-emerald-400 dark:bg-emerald-500";
+  if (s === "reserved") return "bg-rose-400 dark:bg-rose-500";
+  if (s === "maintenance" || s === "cleaning") return "bg-amber-400 dark:bg-amber-500";
+  return "bg-slate-300 dark:bg-slate-600";
+}
+
 export function DashboardPage() {
   const [source, setSource] = useState("usthing");
   const [page, setPage] = useState(0);
@@ -323,14 +331,14 @@ export function DashboardPage() {
                                   : `border-slate-100 ${hasContent ? "bg-white" : "bg-slate-50/60"}`}`}
                             >
                               {compact ? (
-                                  <div className={`grid gap-0.5 ${source === "jiushi" ? "grid-cols-7" : "grid-cols-4"}`}>
+                                  <div className={`grid gap-px ${source === "jiushi" ? "grid-cols-7" : "grid-cols-4"}`}>
                                     {facilityOrder.map((fid) => {
                                       const s = cellSlots.find((cs: Slot) => cs.FacilityID === fid);
                                       if (!s) return <div key={fid} className="invisible select-none" />;
                                       return (
                                         <span
                                           key={fid}
-                                          className={`mx-auto h-2.5 w-2.5 rounded-full border ${statusDot(s.Status)}`}
+                                          className={`h-3 w-full rounded-sm ${statusRect(s.Status)}`}
                                           title={`${resolveFacilityName(fid, sourceKey)}: ${statusLabel(s.Status)}`}
                                         />
                                       );

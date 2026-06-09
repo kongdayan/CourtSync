@@ -17,5 +17,6 @@ dist/
 
 # Local environment overrides
 .dev.vars
+worker-configuration.d.ts
 courtsync
 jiushi-proxy

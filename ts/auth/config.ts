@@ -1,11 +1,23 @@
 import { betterAuth } from "better-auth";
+import { withCloudflare } from "better-auth-cloudflare";
 
 export function createAuth(env: Env) {
+  const cloudflareCfg = withCloudflare(
+    {
+      d1Native: env.APP_DB,
+      autoDetectIpAddress: false,
+      geolocationTracking: false,
+    },
+    {
+      database: env.APP_DB,
+    },
+  );
+
   return betterAuth({
     appName: "CourtSync",
-    baseURL: env.APP_BASE_URL,
+    baseURL: `${env.APP_BASE_URL}/api/auth`,
     secret: env.BETTER_AUTH_SECRET,
-    database: env.APP_DB,
+    database: cloudflareCfg.database,
     socialProviders: {
       google: {
         clientId: env.GOOGLE_CLIENT_ID,
@@ -14,8 +26,8 @@ export function createAuth(env: Env) {
       } as never,
     },
     session: {
-      expiresIn: 60 * 60 * 24 * 30, // 30 days
-      updateAge: 60 * 60 * 24, // 1 day
+      expiresIn: 60 * 60 * 24 * 30,
+      updateAge: 60 * 60 * 24,
       cookieCache: { enabled: false },
     },
     account: {

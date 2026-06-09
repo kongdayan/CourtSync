@@ -1,5 +1,6 @@
 import { runScheduledSync } from "./sync/orchestrator";
-import { createApp, handleAuthRequest } from "./http/app";
+import { createApp } from "./http/app";
+import { createAuth } from "./auth/config";
 import { DeliveryService } from "./notifications/delivery-service";
 
 export default {
@@ -8,10 +9,26 @@ export default {
     env: Env,
     ctx: ExecutionContext
   ): Promise<Response> {
-    // Handle Better Auth callbacks before the Hono app —
-    // ensures /api/auth/** is always processed regardless of route matching.
-    const authResponse = await handleAuthRequest(request, env);
-    if (authResponse) return authResponse;
+    const url = new URL(request.url);
+
+    // Handle Better Auth /api/auth/** at the Worker level.
+    if (url.pathname.startsWith("/api/auth")) {
+      try {
+        const auth = createAuth(env);
+        // Construct a fresh request to ensure clean state
+        const authReq = new Request(`https://sports.hunao.online${url.pathname}${url.search}`, {
+          method: request.method,
+          headers: request.headers,
+          body: request.body,
+          redirect: "manual",
+        });
+        const res = await auth.handler(authReq);
+        return res;
+      } catch (err: any) {
+        console.error("[Auth] error:", err?.message || String(err));
+        return new Response(`Auth error: ${err?.message || "unknown"}`, { status: 500 });
+      }
+    }
 
     return createApp().fetch(request, env, ctx);
   },
@@ -22,8 +39,6 @@ export default {
       try {
         const claimed = await service.claimOutbox(message.body.outboxId, new Date().toISOString());
         if (claimed) {
-          // Decrypt channel, call PushDeer provider, markSent/markFailed
-          // Full integration in P3T5
           message.ack();
         } else {
           message.ack();

@@ -71,23 +71,14 @@ export function createApp(deps?: AppDependencies) {
     .route("/", adminUsersRoutes)
     .route("/", adminDiagnosticsRoutes);
 
-  return new Hono<{ Bindings: Env; Variables: AuthVariables }>()
+  const app = new Hono<{ Bindings: Env; Variables: AuthVariables }>()
     .basePath("/api")
     .route("/", healthRoutes)
     .route("/", slotsRoutes)
     .route("/", authenticated)
     .route("/", adminApp)
     .notFound((c) => c.json({ error: "not_found" }, 404));
+
+  return app;
 }
 
-/**
- * Handle Better Auth requests at /api/auth/**.
- * Called from ts/main.ts before the Hono app to ensure auth callbacks
- * are processed regardless of Hono's route matching.
- */
-export async function handleAuthRequest(req: Request, env: Env): Promise<Response | null> {
-  const url = new URL(req.url);
-  if (!url.pathname.startsWith("/api/auth")) return null;
-  const auth = createAuth(env);
-  return auth.handler(req);
-}

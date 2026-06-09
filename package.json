@@ -1,5 +1,5 @@
 {
-  "name": "fbs-hkust-spider-worker",
+  "name": "courtsync",
   "version": "0.1.0",
   "type": "module",
   "scripts": {

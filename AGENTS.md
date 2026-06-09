@@ -1,59 +1,51 @@
 # AGENTS.md
 
 ## Purpose
-This repo bundles a Cloudflare Worker (TypeScript) and a Go CLI for scanning HKUST badminton court availability, persisting snapshots, and rendering a dashboard.
+CourtSync is a multi-source badminton court availability tracker — Cloudflare Worker (TypeScript) + Go CLI. Currently supports USThing (HKUST) and Jiushi (久事体育), with multi-tenant architecture ready for expansion.
 
 ## Key Paths
 - `ts/` Cloudflare Worker source (handlers, services, views, D1 helpers).
 - `ts/main.ts` Worker entrypoint.
-- `ts/sources/usthing.ts` USThing API client — v3/msapi endpoints + Azure AD auth.
+- `ts/sources/usthing.ts` USThing API client — v3/msapi + Azure AD auth with auto-refresh.
+- `ts/sources/jiushi.ts` Jiushi API client — auto acw_tc WAF cookie + js_sign.
 - `ts/service/` Slot aggregation and business logic.
-- `ts/views/` HTML rendering for the dashboard.
-- `ts/constants/` Facility and display mappings.
+- `ts/views/` HTML dashboard rendering.
+- `ts/constants/` Facility ID → display name mappings.
 - `d1/schema.sql` D1 schema for `slot_snapshot`.
 - `wrangler.toml` Worker config, cron triggers, and bindings.
-- `internal/usthing/usthing.go` Go API client — TokenManager for auto-refreshing Azure AD tokens.
+- `internal/usthing/usthing.go` Go USThing client — TokenManager with auto-refresh + 401 retry.
+- `internal/jiushi/jiushi.go` Go Jiushi client — auto acw_tc acquisition.
 - `internal/service/` Go slot aggregation.
 - `cmd/main/main.go` Go CLI entrypoint.
 
 ## Common Commands
 - Install deps: `npm install`
-- Local dev (with cron simulation): `npx wrangler dev --test-scheduled`
+- Local dev: `npx wrangler dev --test-scheduled`
 - Deploy: `npx wrangler deploy`
 - Go CLI: `go run ./cmd/main/`
-- Go build: `go build -o fbs-scanner ./cmd/main/`
 
 ## Authentication
 
-USThing app v7.20.0 migrated to **Azure AD OAuth2** (tenant `c917f3e2-9322-4926-9bb3-daca730413ca`). Both Go and TS code support two modes:
+### USThing
+Azure AD OAuth2 (tenant `c917f3e2-9322-4926-9bb3-daca730413ca`). Dynamic ROPC via `USTHING_USERNAME`/`USTHING_PASSWORD`, or static `USTHING_BEARER`. Token auto-refresh 5min before expiry, 401 triggers forced refresh + retry.
 
-1. **Dynamic (recommended)**: Set `USTHING_USERNAME` + `USTHING_PASSWORD`. The `TokenManager` (Go) or `acquireToken()` (TS) handles ROPC grant + auto-refresh.
-2. **Static (legacy)**: Set `USTHING_BEARER` with a pre-obtained JWT. Tokens expire ~1h.
+### Jiushi
+Alibaba Cloud ESA WAF issues `acw_tc` cookie on first request. `acquireAcwTc()` sends a warmup POST, caches the cookie for 55min. All API calls signed with `js_sign = base64(md5(payload + salt))`. WAF blocks Cloudflare Worker IPs — use `JIUSHI_PROXY_URL` or run Jiushi sync locally.
 
-Priority: `USTHING_BEARER` > Azure AD credentials > KV `usthing:bearer` (Worker only).
+## API Reference
 
-## USThing API Reference (v3)
-
-| Endpoint | Method | Go function | TS function |
+| Provider | Endpoint | Method | Function (Go/TS) |
 | --- | --- | --- | --- |
-| `/v3/msapi/fbs/facilities` | GET | `GetFacilities()` | `getFacilities()` |
-| `/v3/msapi/fbs/facilityTimeslot` | GET | `GetAvailableTimeSlots()` | `getAvailableTimeSlots()` |
-| `/v3/msapi/fbs/bookingInfo` | GET | `GetBookingInfo()` | `getBookingInfo()` |
-| `/v2/fbs/book` | POST | `Booking()` | `booking()` |
+| USThing | `/v3/msapi/fbs/facilities` | GET | `GetFacilities` / `getFacilities` |
+| USThing | `/v3/msapi/fbs/facilityTimeslot` | GET | `GetAvailableTimeSlots` / `getAvailableTimeSlots` |
+| USThing | `/v3/msapi/fbs/bookingInfo` | GET | `GetBookingInfo` / `getBookingInfo` |
+| USThing | `/v2/fbs/book` | POST | `Booking` / `booking` |
+| Jiushi | `/jiushi-core/venue/getVenueGround` | POST | `QueryVenueData` / `queryVenueData` |
 
-Old v1 endpoints (`/v1/fbs/...`) are **deprecated and return 404**. The v2 booking endpoint is still active.
-
-System returns `errorCode: "03"` / `"The system is closed!"` during night hours (~22:00–08:00 HKT).
-
-## Environment and Data
-- USThing and Jiushi are both supported. The dashboard can switch via `?source=usthing` or `?source=jiushi`.
-- D1 bindings: `DB` (USThing) and `JIUSHI_DB` (Jiushi).
-- **New**: `USTHING_USERNAME` and `USTHING_PASSWORD` for dynamic Azure AD auth. Password should use `wrangler secret put` in production.
-- See `README.md` for full env variable list and deployment steps.
-
-## Change Notes for Agents
-- When adding or removing facility IDs, update both Go and TypeScript maps and service logic (`internal/`, `ts/constants/`, `ts/service/`).
-- Keep table layouts consistent between compact/detailed modes and desktop/mobile rendering.
-- Preserve token warning propagation from fetchers to UI so operators see auth issues quickly.
-- The `TokenManager` in Go is thread-safe and caches tokens with a 5-minute expiry buffer. The TS `acquireToken()` uses an in-memory cache with the same buffer.
-- When the API returns `errorCode: "03"` (system closed), both clients surface it as an error — callers should handle it gracefully (e.g., skip the sync cycle, don't alert).
+## Change Notes
+- When adding facility IDs, update both Go and TS constants + service logic.
+- Table layouts: keep compact/detailed modes and tooltips synchronized.
+- Token/auth warnings must propagate from fetchers to UI.
+- `errorCode: "03"` from USThing = system closed (night hours) — not fatal.
+- Jiushi WAF blocks (`Denied by http_custom`) break early — don't retry all days.
+- v1 endpoints (`/v1/fbs/*`) are dead (404). Do not reintroduce.

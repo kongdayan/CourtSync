@@ -1,121 +1,79 @@
-# Project Overview
+# CourtSync — Project Overview
 
-This repository bundles the original Go-based gym slot scanner together with the TypeScript Worker adaptation used for Cloudflare deployment. The TypeScript implementation lives in `ts/` and is responsible for fetching slot data, rendering an HTML dashboard, and (when enabled) pushing notifications through PushDeer. The Go code under `internal/` mirrors similar functionality for local execution or legacy tooling.
+Multi-source badminton court availability tracker with Cloudflare Worker + Go CLI. Supports USThing (HKUST) and Jiushi (久事体育). Multi-tenant architecture ready for expansion; currently in personal use.
 
 ## Directory Responsibilities
 
 | Path | Purpose |
 | ---- | ------- |
-| `cmd/` | Go entrypoints for the CLI scanner. |
-| `internal/usthing/` | Go USThing API client — v3/msapi endpoints, Azure AD TokenManager with auto-refresh. |
+| `cmd/` | Go CLI entrypoint. |
+| `internal/usthing/` | Go USThing API client — v3/msapi, Azure AD TokenManager with auto-refresh + 401 retry. |
+| `internal/jiushi/` | Go Jiushi API client — auto acw_tc WAF cookie + js_sign. |
 | `internal/service/` | Go slot aggregation and unified data model. |
 | `internal/pushdeer/` | PushDeer notification integration. |
-| `internal/webui/` | WebSocket-based live dashboard server. |
-| `internal/jiushi/` | Jiushi venue API client. |
-| `ts/` | Cloudflare Worker implementation written in TypeScript. |
-| &nbsp;&nbsp;`ts/constants/` | Shared mappings (facility IDs → display names). |
-| &nbsp;&nbsp;`ts/sources/` | Upstream API clients (USThing, Alumni, Jiushi). |
-| &nbsp;&nbsp;`ts/service/` | Business logic for converting and aggregating slot data. |
-| &nbsp;&nbsp;`ts/notifications/` | PushDeer integration for outbound notifications. |
-| &nbsp;&nbsp;`ts/views/` | Server-side rendering for the HTML dashboard (`table.ts`). |
-| `templates/` | Legacy HTML templates used by the old CLI. |
-| `wrangler.toml` | Worker configuration targeting `ts/main.ts`. |
+| `ts/` | Cloudflare Worker (TypeScript). |
+| `ts/sources/` | Upstream API clients (USThing, Jiushi). |
+| `ts/service/` | Slot aggregation and conversion. |
+| `ts/notifications/` | PushDeer integration. |
+| `ts/views/` | HTML dashboard (`table.ts`). |
+| `templates/` | Legacy HTML templates. |
+| `wrangler.toml` | Worker config. |
 
-## API Migration (v1/v2 → v3)
+## API Architecture
 
-The USThing backend was upgraded in app version 7.20.0. Key changes:
+### USThing (v3/msapi — migrated from v1/v2 in app v7.20.0)
 
 | Aspect | Old | New |
 | --- | --- | --- |
-| Auth | Hardcoded JWT Bearer token | Azure AD OAuth2 (ROPC grant), auto-refresh |
+| Auth | Hardcoded JWT | Azure AD OAuth2 ROPC, auto-refresh |
 | Base path | `/v1/fbs/`, `/v2/fbs/` | `/v3/msapi/fbs/` (v2 `/book` retained) |
-| Timeslot endpoint | `/v1/fbs/facilityTimeslot` | `/v3/msapi/fbs/facilityTimeslot` |
-| Facilities list | Did not exist | `/v3/msapi/fbs/facilities` (63 facilities) |
-| Booking list | Did not exist | `/v3/msapi/fbs/bookingInfo` |
-| Booking action | `/v2/fbs/book` | `/v2/fbs/book` (unchanged) |
+| Timeslot | `/v1/fbs/facilityTimeslot` | `/v3/msapi/fbs/facilityTimeslot` |
+| Facilities | N/A | `/v3/msapi/fbs/facilities` (63 facilities) |
+| Bookings | N/A | `/v3/msapi/fbs/bookingInfo` |
 
-Azure AD tenant: `c917f3e2-9322-4926-9bb3-daca730413ca` (HKUST). Token endpoint: `https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token`.
+Azure AD tenant: `c917f3e2-9322-4926-9bb3-daca730413ca` (HKUST). Token endpoint: `login.microsoftonline.com/{tenant}/oauth2/v2.0/token`.
 
-## Current Worker Behaviour
+### Jiushi (WeChat Mini Program API)
 
-* Fetches all configured facilities (`2,3,4,5,79,80,100,101`) from the USThing API (v3/msapi) and aggregates results into a unified slot model.
-* Authenticates via Azure AD ROPC (using `USTHING_USERNAME`/`USTHING_PASSWORD`) or falls back to static `USTHING_BEARER` or KV-stored token.
-* Persists the latest 14-day window (≈1560 rows) into Cloudflare D1 (`slot_snapshot` table), trimming anything outside the horizon each minute.
-* Reads back from D1 when serving HTTP responses so the dashboard/API always reflect the stored snapshot (even if the live fetch fails).
-* Renders a dashboard with dark/compact toggles, JWT warnings, facility status grids, and responsive/mobile layouts.
-* Emits warnings to the UI and JSON response whenever the Bearer token is missing/expired (401 or JWT errors).
-* Handles `errorCode: "03"` (system closed during night hours) gracefully — skips the sync cycle without false alerts.
-* PushDeer integration is present but disabled unless the worker is supplied with PushDeer keys.
+| Component | Detail |
+| --- | --- |
+| Endpoint | `POST jsapp.jussyun.com/jiushi-core/venue/getVenueGround` |
+| WAF | Alibaba Cloud ESA. `acw_tc` cookie acquired via warmup request (3600s TTL). |
+| Signing | `js_sign = base64(md5(JSON(payload) + salt))`, salt: `527093093C418483029EEC61F70E9DD1` |
+| WAF bypass | Cloudflare Worker IPs blocked at edge. Use `JIUSHI_PROXY_URL` or Go CLI locally. |
 
-### D1 storage
+## Worker Behaviour
 
-* Table definition (`d1/schema.sql`):
+- Fetches configured facilities from USThing + Jiushi, aggregates into unified slot model.
+- Auth: Azure AD ROPC (USThing), auto acw_tc (Jiushi). Both support 401/403 retry with token refresh.
+- Persists 14-day window into D1 (`slot_snapshot`), trims stale rows each cycle.
+- Serves dashboard from D1 snapshot (resilient to live fetch failures).
+- Handles `errorCode: "03"` (system closed) and WAF blocks gracefully.
+- PushDeer notifications when slots become available.
 
-  ```sql
-  CREATE TABLE IF NOT EXISTS slot_snapshot (
-    facility_id   TEXT    NOT NULL,
-    slot_date     TEXT    NOT NULL,
-    start_time    TEXT    NOT NULL,
-    end_time      TEXT    NOT NULL,
-    status        TEXT    NOT NULL,
-    activity_name TEXT,
-    updated_at    TEXT    NOT NULL,
-    PRIMARY KEY (facility_id, slot_date, start_time)
-  );
+## D1 Schema
 
-  CREATE INDEX IF NOT EXISTS idx_slot_snapshot_date
-    ON slot_snapshot (slot_date);
-  ```
-
-* Configure Wrangler with the D1 binding:
-
-  ```toml
-  [[d1_databases]]
-  binding = "DB"
-  database_name = "slot-data"
-  database_id = "<replace-with-your-d1-id>"
-  ```
-
-* Persist/load helpers live in `ts/db/slots.ts`.
-* When the Worker starts, it fetches fresh data, runs `persistSlots`, and then renders from the D1 snapshot. If persistence or reload fails, a warning is appended so operators know the snapshot may be stale.
-
-## Planned Multi-Worker Split (Future Work)
-
-The single Worker currently handles scanning, rendering, (optional) pushes, and config. To scale cleanly, migrate to four services sharing common modules:
-
-1. **Scanner Worker** (`slot-scanner`)
-   * Trigger: Cron (`*/1 8-21 * * *`).
-   * Writes slot snapshots to D1.
-   * Optionally enqueues pushes.
-
-2. **Web Worker** (`slot-web`)
-   * Trigger: HTTP routes.
-   * Reads the latest snapshot from D1 and serves HTML/JSON.
-
-3. **Push Worker** (`slot-push`)
-   * Trigger: Queue/Durable Object (or cron after scanner).
-   * Reads user prefs from D1/KV, sends PushDeer notifications.
-
-4. **Config Worker** (`slot-config`)
-   * Trigger: Authenticated HTTP API.
-   * Allows users/admins to update preferences (facilities, frequency, PushDeer keys) stored in D1/KV.
-
-### Shared Assets for New Workers
-
-* Extract shared TypeScript utilities (types, facility maps, API clients) into a reusable package (e.g. `/packages/shared`).
-* Maintain a common D1 schema (slots table, user_config table, push log) and KV namespace (PushDeer secrets).
-* Set up Wrangler configs per worker (`services/scanner/wrangler.toml`, etc.) with appropriate bindings.
+```sql
+CREATE TABLE IF NOT EXISTS slot_snapshot (
+  facility_id   TEXT NOT NULL,
+  slot_date     TEXT NOT NULL,
+  start_time    TEXT NOT NULL,
+  end_time      TEXT NOT NULL,
+  status        TEXT NOT NULL,
+  activity_name TEXT,
+  updated_at    TEXT NOT NULL,
+  PRIMARY KEY (facility_id, slot_date, start_time)
+);
+```
 
 ## AI Agent Notes
 
-* Prefer reusing existing functions from `ts/service/updateTimeSlots.ts`, `ts/views/table.ts`, `ts/sources/usthing.ts`, and `ts/constants/facilities.ts`.
-* For Go, the `TokenManager` in `internal/usthing/usthing.go` is the single source of truth for authentication — all API calls go through `generateHeaders()`.
-* When editing table layout or styling, keep compact/detailed modes and tooltips synchronized across desktop and mobile sections.
-* Any new facility IDs must be added consistently in `internal/service/updateTimeSLots.go`, `ts/constants/facilities.ts`, `ts/service/updateTimeSlots.ts`, and `ts/main.ts`.
-* Token-related warnings should continue to propagate from data-fetching layers to rendering layers so operators are alerted immediately.
-* For build/deploy tasks, remember the rate limits seen in Wrangler logs and throttle repeated `wrangler deploy` attempts.
-* The v1 endpoints (`/v1/fbs/*`) are dead (404). Do not reintroduce them.
-* The v2 `/book` endpoint is the only v2 path still active. All other queries use v3/msapi.
-* System closed errors (`errorCode: "03"`) are expected during night hours — do not treat as fatal.
+- Reuse existing functions from `ts/sources/`, `ts/service/`, `ts/views/`, `ts/constants/`.
+- Go `TokenManager` is the single auth source — all API calls go through `doWithAuthRetry()`.
+- When editing table layouts, keep compact/detailed modes and tooltips synchronized.
+- Facility IDs must be updated consistently across Go + TS.
+- v1 endpoints (`/v1/fbs/*`) are dead (404). Do not reintroduce.
+- `errorCode: "03"` (system closed) is expected at night — not fatal.
+- Jiushi WAF blocks from Cloudflare IPs — use `JIUSHI_PROXY_URL` or local runner.
 
-This document should be kept up-to-date as services are split, schemas evolve, or additional integrations (KV/D1 bindings, queues) are added.
+This document should be kept current as providers are added, schemas evolve, or bindings change.

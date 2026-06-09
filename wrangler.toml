@@ -1,4 +1,4 @@
-name = "fbs-hkust-spider"
+name = "courtsync"
 main = "ts/main.ts"
 compatibility_date = "2024-11-22"
 compatibility_flags = ["nodejs_compat"]

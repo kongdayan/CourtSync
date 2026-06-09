@@ -18,9 +18,7 @@ declare global {
   interface Env {
     USTHING_UST_ID?: string;
     USTHING_FACILITY_IDS?: string;
-    USTHING_BEARER?: string;
     JIUSHI_GROUND_IDS?: string;
-    JIUSHI_COOKIE?: string;
   }
 }
 
@@ -44,13 +42,7 @@ async function resolveUSThingBearer(
   env: Env,
   warnings: string[]
 ): Promise<string | undefined> {
-  // 优先使用静态 bearer（向后兼容）
-  const inlineBearer = env.USTHING_BEARER?.trim();
-  if (inlineBearer) {
-    return inlineBearer;
-  }
-
-  // 尝试 Azure AD 动态获取 token
+  // Azure AD 动态获取 token
   const username = env.USTHING_USERNAME?.trim();
   const password = env.USTHING_PASSWORD?.trim();
   if (username && password) {
@@ -69,7 +61,7 @@ async function resolveUSThingBearer(
   // 回退到 KV 中存储的 token
   if (!env.hkust_token) {
     warnings.push(
-      "USThing bearer token is not configured. Set USTHING_USERNAME+USTHING_PASSWORD for Azure AD auto-auth, USTHING_BEARER for a static token, or configure KV."
+      "USThing bearer token is not configured. Set USTHING_USERNAME+USTHING_PASSWORD for Azure AD auto-auth, or configure KV."
     );
     return undefined;
   }
@@ -141,7 +133,6 @@ function parseJiushiConfig(
     maxDays,
     proxyUrl: env?.JIUSHI_PROXY_URL?.trim() || undefined,
     proxyToken: env?.JIUSHI_PROXY_TOKEN?.trim() || undefined,
-    cookie: env?.JIUSHI_COOKIE?.trim() || undefined,
   };
 }
 

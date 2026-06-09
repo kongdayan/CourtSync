@@ -79,6 +79,8 @@ export function DashboardPage() {
     staleTime: 60_000,
   });
 
+  const sourceKey = source as DataSourceKey;
+
   // Toggle dark mode
   const toggleDark = () => {
     const next = !dark;
@@ -127,11 +129,12 @@ export function DashboardPage() {
     return { dates: displayDates, slotsByDateTime: byDateTime, totalPages: tp, facilityOrder: fo };
   }, [data, source, page]);
 
-  // Snapshot export
+  // CSV export
   const handleExport = () => {
+    const src = source as DataSourceKey;
     if (!data?.slots.length) return;
     const rows = data.slots.map(
-      (s) => `${s.Date},${s.StartTime},${s.EndTime},${resolveFacilityName(s.FacilityID)},${s.Status}`
+      (s) => `${s.Date},${s.StartTime},${s.EndTime},${resolveFacilityName(s.FacilityID, src)},${s.Status}`
     );
     const csv = ["Date,Start,End,Facility,Status", ...rows].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -328,9 +331,9 @@ export function DashboardPage() {
                                     <span
                                       key={s.FacilityID}
                                       className={`inline-block rounded px-1 py-0.5 text-[10px] leading-none ${statusColor(s.Status)}`}
-                                      title={`${resolveFacilityName(s.FacilityID)}: ${statusLabel(s.Status)}`}
+                                      title={`${resolveFacilityName(s.FacilityID, sourceKey)}: ${statusLabel(s.Status)}`}
                                     >
-                                      {s.FacilityID}
+                                      {resolveFacilityName(s.FacilityID, sourceKey)}
                                     </span>
                                   ))}
                                 </div>
@@ -343,9 +346,9 @@ export function DashboardPage() {
                                       <span
                                         key={fid}
                                         className={`inline-block rounded px-1 py-0.5 text-[10px] leading-none ${statusColor(s.Status)}`}
-                                        title={`${resolveFacilityName(fid)}: ${statusLabel(s.Status)}`}
+                                        title={`${resolveFacilityName(fid, sourceKey)}: ${statusLabel(s.Status)}`}
                                       >
-                                        {resolveFacilityName(fid)}
+                                        {resolveFacilityName(fid, sourceKey)}
                                       </span>
                                     );
                                   })}

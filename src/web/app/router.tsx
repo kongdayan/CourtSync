@@ -2,8 +2,11 @@ import { createBrowserRouter } from "react-router-dom";
 import { DashboardPage } from "../features/dashboard/DashboardPage";
 import { LoginPage } from "../features/auth/LoginPage";
 import { AccountPage } from "../features/account/AccountPage";
+import { RulesPage } from "../features/rules/RulesPage";
+import { RuleEditorPage } from "../features/rules/RuleEditorPage";
+import { PushDeerSettingsPage } from "../features/channels/PushDeerSettingsPage";
+import { AdminUsersPage } from "../features/admin/AdminUsersPage";
 import { RequireAccess } from "../features/auth/RequireAccess";
-import { ComingSoonPage } from "../features/shared/ComingSoonPage";
 
 export const router = createBrowserRouter([
   { path: "/", element: <DashboardPage /> },
@@ -12,8 +15,11 @@ export const router = createBrowserRouter([
   {
     element: <RequireAccess status="active" />,
     children: [
-      { path: "/rules", element: <ComingSoonPage title="通知规则" /> },
-      { path: "/settings/notifications", element: <ComingSoonPage title="推送设置" /> },
+      { path: "/rules", element: <RulesPage /> },
+      { path: "/rules/new", element: <RuleEditorPage /> },
+      { path: "/rules/:ruleId", element: <RuleEditorPage /> },
+      { path: "/settings/notifications", element: <PushDeerSettingsPage /> },
     ],
   },
+  { path: "/admin/users", element: <AdminUsersPage /> },
 ]);

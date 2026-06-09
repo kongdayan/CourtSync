@@ -334,7 +334,7 @@ export function DashboardPage() {
                                   <div className={`grid gap-px ${source === "jiushi" ? "grid-cols-7" : "grid-cols-4"}`}>
                                     {facilityOrder.map((fid) => {
                                       const s = cellSlots.find((cs: Slot) => cs.FacilityID === fid);
-                                      if (!s) return <div key={fid} className="invisible select-none" />;
+                                      if (!s) return <div key={fid} className="invisible h-4 select-none" />;
                                       return (
                                         <span
                                           key={fid}

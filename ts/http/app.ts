@@ -59,6 +59,9 @@ export function createApp(deps?: AppDependencies) {
   });
 
   // Authenticated route group (session + access gate + CSRF).
+  // NOTE: meRoutes is mounted before activeUserMiddleware intentionally —
+  // pending and disabled users must be able to call GET /api/me to discover
+  // their own access status. Protected feature routes go below the gates.
   const authenticated = new Hono<{
     Bindings: Env;
     Variables: AuthVariables;

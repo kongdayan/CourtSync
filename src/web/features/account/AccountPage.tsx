@@ -4,10 +4,14 @@ import { Navigate, useNavigate } from "react-router-dom";
 
 export function AccountPage() {
   const navigate = useNavigate();
-  const { data, isLoading } = useMe();
+  const { data, isLoading, error } = useMe();
 
   if (isLoading) {
     return <div className="flex min-h-screen items-center justify-center">加载中...</div>;
+  }
+
+  if (error) {
+    return <div className="flex min-h-screen items-center justify-center text-red-500">加载失败，请刷新页面重试</div>;
   }
 
   if (!data) {

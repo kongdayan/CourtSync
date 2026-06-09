@@ -2,11 +2,9 @@ import {
   updateUSThingTimeSlots,
   updateJiushiTimeSlots,
 } from "../service/updateTimeSlots";
-import { PushDeerService } from "../notifications/pushdeer";
 import { acquireToken, setCredentials } from "../sources/usthing";
 import {
   UnifiedTimeSlot,
-  PushDeerConfig,
   USThingConfig,
   JiushiConfig,
   DataSourceKey,
@@ -18,7 +16,6 @@ import { persistSlots } from "../db/slots";
 // in the auto-generated type from wrangler config.
 declare global {
   interface Env {
-    PUSHDEER_KEYS?: string;
     USTHING_UST_ID?: string;
     USTHING_FACILITY_IDS?: string;
     JIUSHI_GROUND_IDS?: string;
@@ -40,24 +37,6 @@ export interface TimeslotSyncResult {
 }
 
 export const AVAILABLE_SOURCES: DataSourceKey[] = ["usthing", "jiushi"];
-
-function parsePushConfig(env?: Env): PushDeerConfig | null {
-  const rawKeys = env?.PUSHDEER_KEYS;
-  if (!rawKeys) {
-    return null;
-  }
-
-  const pushKeys = rawKeys
-    .split(",")
-    .map((key) => key.trim())
-    .filter(Boolean);
-
-  if (!pushKeys.length) {
-    return null;
-  }
-
-  return { pushKeys };
-}
 
 async function resolveUSThingBearer(
   env: Env,
@@ -205,28 +184,12 @@ async function runUSThingTimeslotSync(
     );
   }
 
-  const pushConfig = parsePushConfig(env);
-
   if (!slots.length) {
     const jwtWarning =
       "USThing authorization token appears to be invalid or expired. Please contact the administrator to refresh the bearer JWT.";
     if (!warnings.some((w) => w.toLowerCase().includes("jwt"))) {
       warnings.push(jwtWarning);
     }
-  }
-
-  if (pushConfig && slots.length > 0) {
-    console.log(
-      `[PushDeer] Dispatching ${slots.length} slots to ${pushConfig.pushKeys.length} keys`
-    );
-    const pushService = new PushDeerService(pushConfig.pushKeys);
-    await pushService.pushTimeSlots(slots, fetchImpl);
-  } else if (pushConfig) {
-    console.log(
-      "[PushDeer] Push configured but no slots available; skipping notification"
-    );
-  } else {
-    console.log("[PushDeer] No push configuration provided; skipping push");
   }
 
   if (!slots.length) {

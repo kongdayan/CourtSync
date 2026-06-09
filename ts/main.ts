@@ -1,7 +1,7 @@
 import { DataSourceKey } from "./types";
-import { getTodayUTC8, getDateDaysAhead } from "./utils/time";
 
 import { runTimeslotSync, AVAILABLE_SOURCES, USTHING_BEARER_KV_KEY } from "./sync/run";
+import { runScheduledSync } from "./sync/orchestrator";
 import { createApp } from "./http/app";
 import { DeliveryService } from "./notifications/delivery-service";
 
@@ -163,30 +163,6 @@ export default {
     env: Env,
     ctx: ExecutionContext
   ): Promise<void> {
-    const startDate = getTodayUTC8();
-    const endDate = getDateDaysAhead(14);
-    ctx.waitUntil(
-      (async () => {
-        for (const source of AVAILABLE_SOURCES) {
-          try {
-            const result = await runTimeslotSync(
-              source,
-              env,
-              fetch,
-              startDate,
-              endDate
-            );
-            if (result.warnings.length) {
-              console.warn(
-                `[${source}] Scheduled sync warnings:`,
-                result.warnings
-              );
-            }
-          } catch (error) {
-            console.error(`[${source}] Scheduled sync failed`, error);
-          }
-        }
-      })()
-    );
+    ctx.waitUntil(runScheduledSync(env, new Date(event.scheduledTime)));
   },
 };

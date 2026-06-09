@@ -1,5 +1,5 @@
 import { runScheduledSync } from "./sync/orchestrator";
-import { createApp } from "./http/app";
+import { createApp, handleAuthRequest } from "./http/app";
 import { DeliveryService } from "./notifications/delivery-service";
 
 export default {
@@ -8,6 +8,11 @@ export default {
     env: Env,
     ctx: ExecutionContext
   ): Promise<Response> {
+    // Handle Better Auth callbacks before the Hono app —
+    // ensures /api/auth/** is always processed regardless of route matching.
+    const authResponse = await handleAuthRequest(request, env);
+    if (authResponse) return authResponse;
+
     return createApp().fetch(request, env, ctx);
   },
 

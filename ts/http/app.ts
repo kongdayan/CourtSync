@@ -19,10 +19,6 @@ import type { UserAccess } from "../app-db/types";
 
 /**
  * Overridable session/access resolvers used to inject stubs during tests.
- *
- * Each function receives the Cloudflare {@link Env} so that default
- * implementations backed by real Better Auth + D1 can be wired up here,
- * while test stubs ignore the parameter entirely.
  */
 export interface AppDependencies {
   getSession?: (
@@ -36,7 +32,6 @@ export interface AppDependencies {
 }
 
 export function createApp(deps?: AppDependencies) {
-  // Default resolvers backed by real Better Auth + D1.
   const getSession: NonNullable<AppDependencies["getSession"]> =
     deps?.getSession ??
     (async (headers, env) => {
@@ -58,19 +53,9 @@ export function createApp(deps?: AppDependencies) {
       });
     });
 
-  const sessionMiddleware = createSessionMiddleware({
-    getSession,
-    ensureForLogin,
-  });
+  const sessionMiddleware = createSessionMiddleware({ getSession, ensureForLogin });
 
-  // Authenticated route group (session + access gate + CSRF).
-  // NOTE: meRoutes is mounted before activeUserMiddleware intentionally —
-  // pending and disabled users must be able to call GET /api/me to discover
-  // their own access status. Protected feature routes go below the gates.
-  const authenticated = new Hono<{
-    Bindings: Env;
-    Variables: AuthVariables;
-  }>()
+  const authenticated = new Hono<{ Bindings: Env; Variables: AuthVariables }>()
     .use(sessionMiddleware)
     .route("/", meRoutes)
     .use(activeUserMiddleware)
@@ -79,7 +64,6 @@ export function createApp(deps?: AppDependencies) {
     .route("/", channelsRoutes)
     .get("/protected", (c) => c.json({ ok: true }));
 
-  // Admin route group — full middleware stack (session + active user + admin role).
   const adminApp = new Hono<{ Bindings: Env; Variables: AuthVariables }>()
     .use(sessionMiddleware)
     .use(activeUserMiddleware)
@@ -89,19 +73,21 @@ export function createApp(deps?: AppDependencies) {
 
   return new Hono<{ Bindings: Env; Variables: AuthVariables }>()
     .basePath("/api")
-    // Better Auth handles /api/auth/** — mounted before any other middleware so
-    // that the library owns its own callbacks and form content types.
-    .all("/auth/:path{.+}", async (c) => {
-      const auth = createAuth(c.env);
-      return auth.handler(c.req.raw);
-    })
-    .all("/auth", async (c) => {
-      const auth = createAuth(c.env);
-      return auth.handler(c.req.raw);
-    })
     .route("/", healthRoutes)
     .route("/", slotsRoutes)
     .route("/", authenticated)
     .route("/", adminApp)
     .notFound((c) => c.json({ error: "not_found" }, 404));
+}
+
+/**
+ * Handle Better Auth requests at /api/auth/**.
+ * Called from ts/main.ts before the Hono app to ensure auth callbacks
+ * are processed regardless of Hono's route matching.
+ */
+export async function handleAuthRequest(req: Request, env: Env): Promise<Response | null> {
+  const url = new URL(req.url);
+  if (!url.pathname.startsWith("/api/auth")) return null;
+  const auth = createAuth(env);
+  return auth.handler(req);
 }

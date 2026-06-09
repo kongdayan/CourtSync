@@ -1,9 +1,12 @@
 package service
 
 import (
+	"FBS_HKUST_SPIDER/internal/jiushi"
 	"FBS_HKUST_SPIDER/internal/usthing"
 	"fmt"
+	"log"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -106,4 +109,63 @@ func UpdateTimeSlots() ([]UnifiedTimeSlot, error) {
 	}
 
 	return ConvertUSThingToUnified(allUSThingSlots), nil
+}
+
+// UpdateJiushiTimeSlots Jiushi 场地扫描
+func UpdateJiushiTimeSlots(venueID string) ([]UnifiedTimeSlot, error) {
+	maxDays := 9
+	if d := os.Getenv("JIUSHI_MAX_DAYS"); d != "" {
+		if n, err := strconv.Atoi(d); err == nil && n > 0 {
+			maxDays = n
+		}
+	}
+
+	groundFilter := make(map[string]bool)
+	if ids := os.Getenv("JIUSHI_GROUND_IDS"); ids != "" {
+		for _, id := range splitAndTrim(ids, ",") {
+			groundFilter[id] = true
+		}
+	}
+
+	var allSlots []UnifiedTimeSlot
+	today := time.Now()
+
+	for i := 0; i < maxDays; i++ {
+		date := today.AddDate(0, 0, i)
+		bookTime := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.UTC).Unix()
+
+		resp, err := jiushi.QueryVenueData(venueID, bookTime)
+		if err != nil {
+			return nil, fmt.Errorf("jiushi query failed for %s: %v", date.Format("2006-01-02"), err)
+		}
+
+		for _, status := range resp.Data.StatusList {
+			startMs := status.StartTime
+			endMs := status.EndTime
+			slotDate := time.Unix(startMs/1000, 0).In(time.FixedZone("UTC+8", 8*3600)).Format("2006-01-02")
+			startTime := time.Unix(startMs/1000, 0).In(time.FixedZone("UTC+8", 8*3600)).Format("15:04")
+			endTime := time.Unix(endMs/1000, 0).In(time.FixedZone("UTC+8", 8*3600)).Format("15:04")
+
+			for _, block := range status.BlockModel {
+				if len(groundFilter) > 0 && !groundFilter[block.GroundId] {
+					continue
+				}
+				statusLabel := "Unavailable"
+				if block.Status == "1" {
+					statusLabel = "Available"
+				}
+				allSlots = append(allSlots, UnifiedTimeSlot{
+					FacilityID:   block.GroundId,
+					Date:         slotDate,
+					StartTime:    startTime,
+					EndTime:      endTime,
+					Status:       statusLabel,
+					ActivityName: block.GroundName,
+				})
+			}
+		}
+	}
+
+	log.Printf("[Jiushi] Scanned %d days, %d total slots", maxDays, len(allSlots))
+	return allSlots, nil
 }

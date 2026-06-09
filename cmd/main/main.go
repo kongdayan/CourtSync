@@ -1,188 +1,181 @@
 package main
 
 import (
-	// alumni "FBS_HKUST_SPIDER/internal/alumni"
-	// "FBS_HKUST_SPIDER/internal/jiushi"
 	"FBS_HKUST_SPIDER/internal/pushdeer"
 	"FBS_HKUST_SPIDER/internal/service"
+	"FBS_HKUST_SPIDER/internal/usthing"
 	"FBS_HKUST_SPIDER/internal/webui"
+	"flag"
 	"fmt"
+	"log"
+	"os"
+	"strings"
 	"time"
 )
 
-// 获取当前时间（UTC+8）
 func getCurrentTimeInUTC8() time.Time {
-	// 定义 UTC+8 时区
 	utc8 := time.FixedZone("UTC+8", 8*3600)
-	// 获取当前 UTC 时间，并将其转换为 UTC+8
 	return time.Now().In(utc8)
 }
 
-// 等待到指定的目标时间
-func waitUntilTargetTime() {
-	for {
-		now := time.Now()
-		// 定义目标时间为 UTC+8 的 8:00:10
-		target := time.Date(now.Year(), now.Month(), now.Day(), 7, 59, 59, 0, time.FixedZone("UTC+8", 8*3600))
+func main() {
+	sourceFlag := flag.String("source", "", "Data sources to use: usthing,jiushi (comma-separated, default: configured sources)")
+	onceFlag := flag.Bool("once", false, "Run once and exit (no cron/WebSocket)")
+	flag.Parse()
 
-		// 如果当前时间已经超过了目标时间，则等待明天的同一时间
-		if now.After(target) {
-			target = target.Add(24 * time.Hour)
-		}
+	// 解析启用的数据源
+	enabledSources := resolveSources(*sourceFlag)
 
-		// 计算到目标时间的剩余时间
-		sleepDuration := time.Until(target)
-		fmt.Printf("Waiting until %s (UTC+8)...\n", target.Format("15:04:05"))
+	if len(enabledSources) == 0 {
+		fmt.Println("No data sources enabled.")
+		fmt.Println("")
+		fmt.Println("Usage:")
+		fmt.Println("  courtsync                        Run with configured sources")
+		fmt.Println("  courtsync --source=usthing       Run USThing only")
+		fmt.Println("  courtsync --source=jiushi        Run Jiushi only")
+		fmt.Println("  courtsync --source=usthing,jiushi Run both")
+		fmt.Println("  courtsync --once                 Run once and exit")
+		fmt.Println("")
+		fmt.Println("Environment variables:")
+		fmt.Println("  USTHING_USERNAME / USTHING_PASSWORD   Azure AD credentials")
+		fmt.Println("  USTHING_UST_ID                        User ID (optional)")
+		fmt.Println("  USTHING_FACILITY_IDS                  Comma-separated facility IDs")
+		fmt.Println("  JIUSHI_VENUE_ID                       Jiushi venue ID (e.g. 27)")
+		fmt.Println("  JIUSHI_MAX_DAYS                       Max days to fetch (default 9)")
+		fmt.Println("  PUSHDEER_KEYS                         Comma-separated PushDeer keys")
+		os.Exit(0)
+	}
 
-		// 睡眠到目标时间
-		time.Sleep(sleepDuration)
+	log.Printf("Enabled sources: %s", strings.Join(enabledSources, ", "))
 
-		// 到达目标时间后，退出函数
+	// 验证凭据
+	validateCredentials(enabledSources)
+
+	// 一次性模式
+	if *onceFlag {
+		runOnce(enabledSources)
 		return
 	}
-}
 
-func main() {
-	// 启动WebSocket服务器
-	fmt.Println("启动WebSocket服务器...")
-	
-	// PushDeer PushKey 列表
-	pushKeys := []string{
-		"PDU6737T1Qnk6LJpLDpreHNd9JM0voDWIT1cs8SB",
-		"PDU25946T0PBE2qYUzkfE0UPDqtJtjmJEKQMEGgrx",
-		"PDU20193TuD3dWVREr3BgOZJ8y1zvL1XGMCERhN3P",
-	}
-
-	// 创建 PushDeerService
-	pushDeerService := pushdeer.NewPushDeerService(pushKeys)
-	
-	// 启动数据更新服务
+	// 常驻模式：WebSocket + 定时扫描
+	fmt.Println("Starting WebSocket server on :8080...")
 	go func() {
-		// 创建一个定时器，每分钟触发一次
 		ticker := time.NewTicker(1 * time.Minute)
 		defer ticker.Stop()
-
-		// 定时执行数据更新
 		for range ticker.C {
-			// 获取当前时间并检查是否在开放时间段内
 			now := getCurrentTimeInUTC8()
 			hour := now.Hour()
-
 			if hour >= 8 && hour < 22 {
-				fmt.Println("开始执行任务: ", now)
-				unifiedSlots, err := service.UpdateTimeSlots()
-				if err != nil {
-					fmt.Println("数据更新失败:", err)
-				} else {
-					err = pushDeerService.PushTimeSlots(unifiedSlots)
-					if err != nil {
-						fmt.Println("数据推送失败:", err)
-					}
-				}
+				log.Println("Running scheduled scan...")
+				scanAll(enabledSources)
 			} else {
-				fmt.Println("当前时间不在 8:00 到 22:00 之间，跳过数据更新...")
+				log.Println("Outside operating hours (08:00-22:00 HKT), skipping...")
 			}
 		}
 	}()
-	
-	// 启动WebSocket服务器，使用8080端口
+
 	webui.StartWebSocketServer("8080")
-
-	// 以下是原有的代码，现在被注释掉
-	// jiushi.ExampleUsage()
-	// PushDeer PushKey 列表
-	// pushKeys := []string{
-	// 	"PDU6737T1Qnk6LJpLDpreHNd9JM0voDWIT1cs8SB",
-	// 	"PDU25946T0PBE2qYUzkfE0UPDqtJtjmJEKQMEGgrx",
-	// 	"PDU20193TuD3dWVREr3BgOZJ8y1zvL1XGMCERhN3P",
-	// 	// 添加更多 PushKey...
-	// }
-
-	// // 创建 PushDeerService
-	// pushDeerService := pushdeer.NewPushDeerService(pushKeys)
-
-	// // 创建一个 Ticker，每隔 1 分钟触发一次
-	// ticker := time.NewTicker(1 * time.Minute)
-	// defer ticker.Stop()
-
-	// // 无限循环以定期运行任务
-	// for {
-	// 	now := getCurrentTimeInUTC8()
-	// 	hour := now.Hour()
-
-	// 	// 如果当前时间在 8:00 到 22:00 之间，执行任务
-	// 	if hour >= 8 && hour < 22 {
-	// 		fmt.Println("开始执行任务: ", now)
-
-	// 		// 调用 UpdateTimeSlots 函数，获取可用的时间段
-	// 		unifiedSlots, err := service.UpdateTimeSlots()
-	// 		if err != nil {
-	// 			fmt.Println("Error updating timeslots:", err)
-	// 			continue
-	// 		}
-
-	// 		// 调用 PushDeerService 推送结果
-	// 		err = pushDeerService.PushTimeSlots(unifiedSlots)
-	// 		if err != nil {
-	// 			fmt.Println("Error pushing timeslots:", err)
-	// 		}
-
-	// 		// 休眠1分钟后再次检查并执行任务
-	// 		time.Sleep(1 * time.Minute)
-
-	// 	} else {
-	// 		// 如果当前时间晚于 22:00 或早于 8:00，则等待到第二天 8:00
-	// 		fmt.Println("当前时间不在 8:00 到 22:00 之间，进入休眠...")
-	// 		waitUntilTargetTime()
-	// 	}
-	// }
 }
-	
-	// 以下是原有的代码，现在被注释掉
-	// jiushi.ExampleUsage()
-	// PushDeer PushKey 列表
-	// pushKeys := []string{
-	// 	"PDU6737T1Qnk6LJpLDpreHNd9JM0voDWIT1cs8SB",
-	// 	"PDU25946T0PBE2qYUzkfE0UPDqtJtjmJEKQMEGgrx",
-	// 	"PDU20193TuD3dWVREr3BgOZJ8y1zvL1XGMCERhN3P",
-	// 	// 添加更多 PushKey...
-	// }
 
-	// // 创建 PushDeerService
-	// pushDeerService := pushdeer.NewPushDeerService(pushKeys)
+func resolveSources(flagVal string) []string {
+	if flagVal != "" {
+		return parseSourceList(flagVal)
+	}
 
-	// // 创建一个 Ticker，每隔 1 分钟触发一次
-	// ticker := time.NewTicker(1 * time.Minute)
-	// defer ticker.Stop()
+	// 从环境变量自动检测：有凭据就启用
+	var sources []string
+	if os.Getenv("USTHING_USERNAME") != "" || os.Getenv("USTHING_BEARER") != "" {
+		sources = append(sources, "usthing")
+	}
+	if os.Getenv("JIUSHI_VENUE_ID") != "" {
+		sources = append(sources, "jiushi")
+	}
+	return sources
+}
 
-	// // 无限循环以定期运行任务
-	// for {
-	// 	now := getCurrentTimeInUTC8()
-	// 	hour := now.Hour()
+func parseSourceList(s string) []string {
+	parts := strings.Split(s, ",")
+	var result []string
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "usthing" || p == "jiushi" {
+			result = append(result, p)
+		}
+	}
+	return result
+}
 
-	// 	// 如果当前时间在 8:00 到 22:00 之间，执行任务
-	// 	if hour >= 8 && hour < 22 {
-	// 		fmt.Println("开始执行任务: ", now)
+func validateCredentials(sources []string) {
+	for _, s := range sources {
+		switch s {
+		case "usthing":
+			if os.Getenv("USTHING_USERNAME") == "" && os.Getenv("USTHING_BEARER") == "" {
+				log.Println("[WARN] USThing enabled but no credentials set (USTHING_USERNAME or USTHING_BEARER)")
+			}
+		case "jiushi":
+			if os.Getenv("JIUSHI_VENUE_ID") == "" {
+				log.Println("[WARN] Jiushi enabled but JIUSHI_VENUE_ID not set — defaulting to 27")
+				os.Setenv("JIUSHI_VENUE_ID", "27")
+			}
+		}
+	}
+}
 
-	// 		// 调用 UpdateTimeSlots 函数，获取可用的时间段
-	// 		unifiedSlots, err := service.UpdateTimeSlots()
-	// 		if err != nil {
-	// 			fmt.Println("Error updating timeslots:", err)
-	// 			continue
-	// 		}
+func runOnce(sources []string) {
+	fmt.Println("Running one-time scan...")
+	scanAll(sources)
+	fmt.Println("Done.")
+}
 
-	// 		// 调用 PushDeerService 推送结果
-	// 		err = pushDeerService.PushTimeSlots(unifiedSlots)
-	// 		if err != nil {
-	// 			fmt.Println("Error pushing timeslots:", err)
-	// 		}
+func scanAll(sources []string) {
+	pushKeys := os.Getenv("PUSHDEER_KEYS")
+	var pushService *pushdeer.PushDeerService
+	if pushKeys != "" {
+		pushService = pushdeer.NewPushDeerService(strings.Split(pushKeys, ","))
+	}
 
-	// 		// 休眠1分钟后再次检查并执行任务
-	// 		time.Sleep(1 * time.Minute)
+	for _, s := range sources {
+		switch s {
+		case "usthing":
+			slots, err := service.UpdateTimeSlots()
+			if err != nil {
+				if strings.Contains(err.Error(), "USTHING_USERNAME") || strings.Contains(err.Error(), "not set") {
+					log.Printf("[USThing] Skipped — credentials not configured")
+					continue
+				}
+				log.Printf("[USThing] Scan failed: %v", err)
+				continue
+			}
+			log.Printf("[USThing] Found %d available slots", len(slots))
+			if pushService != nil && len(slots) > 0 {
+				if err := pushService.PushTimeSlots(slots); err != nil {
+					log.Printf("[PushDeer] Push failed: %v", err)
+				}
+			}
 
-	// 	} else {
-	// 		// 如果当前时间晚于 22:00 或早于 8:00，则等待到第二天 8:00
-	// 		fmt.Println("当前时间不在 8:00 到 22:00 之间，进入休眠...")
-	// 		waitUntilTargetTime()
-	// 	}
-	// }
+		case "jiushi":
+			venueID := os.Getenv("JIUSHI_VENUE_ID")
+			if venueID == "" {
+				venueID = "27"
+			}
+			jiushiSlots, err := service.UpdateJiushiTimeSlots(venueID)
+			if err != nil {
+				log.Printf("[Jiushi] Scan failed: %v", err)
+				continue
+			}
+			log.Printf("[Jiushi] Found %d slots", len(jiushiSlots))
+
+		default:
+			log.Printf("[%s] Unknown source, skipping", s)
+		}
+	}
+}
+
+// 初始化 token manager
+func init() {
+	if u := os.Getenv("USTHING_USERNAME"); u != "" {
+		if p := os.Getenv("USTHING_PASSWORD"); p != "" {
+			usthing.SetCredentials(u, p)
+		}
+	}
+}

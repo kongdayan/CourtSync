@@ -25,7 +25,7 @@ declare global {
   }
 }
 
-const USTHING_BEARER_KV_KEY = "usthing:bearer";
+export const USTHING_BEARER_KV_KEY = "usthing:bearer";
 
 export type SourceSyncStatus = "success" | "failed";
 
@@ -333,7 +333,7 @@ export async function syncConfiguredSources(
   run: (source: DataSourceKey) => Promise<TimeslotSyncResult>,
 ): Promise<TimeslotSyncResult[]> {
   const results: TimeslotSyncResult[] = [];
-  for (const source of ["usthing", "jiushi"] as const) {
+  for (const source of AVAILABLE_SOURCES) {
     try {
       results.push(await run(source));
     } catch (error) {

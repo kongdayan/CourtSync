@@ -1,8 +1,7 @@
 import { DataSourceKey } from "./types";
 import { getTodayUTC8, getDateDaysAhead } from "./utils/time";
-import { renderSlotsTable } from "./views/table";
-import { loadSlots } from "./db/slots";
-import { runTimeslotSync, AVAILABLE_SOURCES } from "./sync/run";
+
+import { runTimeslotSync, AVAILABLE_SOURCES, USTHING_BEARER_KV_KEY } from "./sync/run";
 import { createApp } from "./http/app";
 
 const DEFAULT_DATA_SOURCE: DataSourceKey = "usthing";
@@ -112,7 +111,7 @@ async function handleTokenAdminRequest(
   }
 
   try {
-    await env.hkust_token.put("usthing:bearer", token);
+    await env.hkust_token.put(USTHING_BEARER_KV_KEY, token);
   } catch (error) {
     console.error("Failed to write token to KV", error);
     return renderTokenAdminPage({

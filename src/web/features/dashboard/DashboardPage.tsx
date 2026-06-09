@@ -326,17 +326,35 @@ export function DashboardPage() {
                               }`}
                             >
                               {compact ? (
-                                <div className="flex flex-wrap justify-center gap-0.5">
-                                  {cellSlots.map((s: Slot) => (
-                                    <span
-                                      key={s.FacilityID}
-                                      className={`inline-block rounded px-1 py-0.5 text-[10px] leading-none ${statusColor(s.Status)}`}
-                                      title={`${resolveFacilityName(s.FacilityID, sourceKey)}: ${statusLabel(s.Status)}`}
-                                    >
-                                      {resolveFacilityName(s.FacilityID, sourceKey)}
-                                    </span>
-                                  ))}
-                                </div>
+                                source === "jiushi" ? (
+                                  <div className="grid grid-cols-7 gap-px">
+                                    {facilityOrder.map((fid) => {
+                                      const s = cellSlots.find((cs: Slot) => cs.FacilityID === fid);
+                                      if (!s) return <div key={fid} className="text-[9px] leading-none invisible">-</div>;
+                                      return (
+                                        <span
+                                          key={fid}
+                                          className={`rounded px-0.5 py-0.5 text-[9px] leading-none truncate ${statusColor(s.Status)}`}
+                                          title={`${resolveFacilityName(fid, sourceKey)}: ${statusLabel(s.Status)}`}
+                                        >
+                                          {resolveFacilityName(fid, sourceKey)}
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
+                                ) : (
+                                  <div className="flex flex-wrap justify-center gap-0.5">
+                                    {cellSlots.map((s: Slot) => (
+                                      <span
+                                        key={s.FacilityID}
+                                        className={`inline-block rounded px-1 py-0.5 text-[10px] leading-none ${statusColor(s.Status)}`}
+                                        title={`${resolveFacilityName(s.FacilityID, sourceKey)}: ${statusLabel(s.Status)}`}
+                                      >
+                                        {resolveFacilityName(s.FacilityID, sourceKey)}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )
                               ) : (
                                 <div className="flex flex-col gap-0.5">
                                   {facilityOrder.map((fid) => {

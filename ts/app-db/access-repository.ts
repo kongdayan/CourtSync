@@ -29,7 +29,7 @@ export class AccessRepository {
         role = CASE WHEN excluded.role = 'admin' THEN 'admin' ELSE role END,
         status = CASE WHEN excluded.status = 'active' THEN 'active' ELSE status END,
         rule_limit = CASE WHEN excluded.role = 'admin' THEN excluded.rule_limit ELSE rule_limit END,
-        status_changed_at = CASE WHEN role IS NOT excluded.role OR status IS NOT excluded.status THEN excluded.status_changed_at ELSE status_changed_at END
+        status_changed_at = CASE WHEN (excluded.role = 'admin' AND role <> excluded.role) OR (excluded.status = 'active' AND status <> excluded.status) THEN excluded.status_changed_at ELSE status_changed_at END
     `).bind(
       input.userId, role, status, ruleLimit,
       input.now, input.now, input.now

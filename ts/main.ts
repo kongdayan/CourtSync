@@ -3,6 +3,7 @@ import {
   updateJiushiTimeSlots,
 } from "./service/updateTimeSlots";
 import { PushDeerService } from "./notifications/pushdeer";
+import { acquireToken, clearTokenCache } from "./sources/usthing";
 import {
   UnifiedTimeSlot,
   PushDeerConfig,
@@ -23,6 +24,10 @@ export interface WorkerEnv {
   USTHING_USER_TYPE?: string;
   USTHING_FACILITY_IDS?: string;
   USTHING_BEARER?: string;
+  /** Azure AD username for dynamic token (ROPC) */
+  USTHING_USERNAME?: string;
+  /** Azure AD password for dynamic token (ROPC) */
+  USTHING_PASSWORD?: string;
   TOKEN_ADMIN_SECRET?: string;
   JIUSHI_VENUE_ID?: string;
   JIUSHI_GROUND_IDS?: string;
@@ -73,14 +78,30 @@ async function resolveUSThingBearer(
   env: WorkerEnv,
   warnings: string[]
 ): Promise<string | undefined> {
+  // 优先使用静态 bearer（向后兼容）
   const inlineBearer = env.USTHING_BEARER?.trim();
   if (inlineBearer) {
     return inlineBearer;
   }
 
+  // 尝试 Azure AD 动态获取 token
+  const username = env.USTHING_USERNAME?.trim();
+  const password = env.USTHING_PASSWORD?.trim();
+  if (username && password) {
+    try {
+      const token = await acquireToken(username, password);
+      return `Bearer ${token}`;
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      warnings.push(`Azure AD token acquisition failed: ${msg}`);
+      console.error("Azure AD token error", error);
+    }
+  }
+
+  // 回退到 KV 中存储的 token
   if (!env.hkust_token) {
     warnings.push(
-      "USThing bearer token is not configured. Update the KV key or set the USTHING_BEARER secret."
+      "USThing bearer token is not configured. Set USTHING_USERNAME+USTHING_PASSWORD for Azure AD auto-auth, USTHING_BEARER for a static token, or configure KV."
     );
     return undefined;
   }

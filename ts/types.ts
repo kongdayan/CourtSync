@@ -36,6 +36,28 @@ export interface USThingConfig {
   userType: string;
   facilityIDs: string[];
   bearer?: string;
+  /** Azure AD username for dynamic token acquisition */
+  username?: string;
+  /** Azure AD password for dynamic token acquisition */
+  password?: string;
+}
+
+/** 设施信息 (v3/msapi/fbs/facilities) */
+export interface USThingFacility {
+  facilityID: number;
+  facilityName: string;
+  location: string;
+}
+
+/** 预订信息 (v3/msapi/fbs/bookingInfo) */
+export interface USThingBookingInfo {
+  facilityID: number;
+  facilityName: string;
+  location: string;
+  timeslotDate: string;
+  startTime: string;
+  endTime: string;
+  bookingRef: number;
 }
 
 export interface JiushiConfig {

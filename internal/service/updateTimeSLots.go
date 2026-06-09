@@ -3,20 +3,20 @@ package service
 import (
 	"FBS_HKUST_SPIDER/internal/usthing"
 	"fmt"
+	"os"
 	"time"
 )
 
 // UnifiedTimeSlot 代表统一的数据结构
 type UnifiedTimeSlot struct {
-	FacilityID   string // 将整数转换为字符串
-	Date         string // 统一使用 date/timeslotDate
+	FacilityID   string
+	Date         string
 	StartTime    string
 	EndTime      string
-	Status       string // 统一使用 status/timeslotStatus
+	Status       string
 	ActivityName string
 }
 
-// String 方法将 UnifiedTimeSlot 转换为字符串
 func (u UnifiedTimeSlot) String() string {
 	return fmt.Sprintf("FacilityID: %s, Date: %s, StartTime: %s, EndTime: %s, Status: %s, ActivityName: %s",
 		u.FacilityID, u.Date, u.StartTime, u.EndTime, u.Status, u.ActivityName)
@@ -25,10 +25,9 @@ func (u UnifiedTimeSlot) String() string {
 // ConvertUSThingToUnified 将 USThingTimeSlot 转换为 UnifiedTimeSlot
 func ConvertUSThingToUnified(usthingSlots []usthing.USThingTimeSlot) []UnifiedTimeSlot {
 	var unifiedSlots []UnifiedTimeSlot
-
 	for _, slot := range usthingSlots {
 		unifiedSlot := UnifiedTimeSlot{
-			FacilityID:   fmt.Sprintf("%d", slot.FacilityID), // 将 int 转换为 string
+			FacilityID:   fmt.Sprintf("%d", slot.FacilityID),
 			Date:         slot.TimeslotDate,
 			StartTime:    slot.StartTime,
 			EndTime:      slot.EndTime,
@@ -37,7 +36,6 @@ func ConvertUSThingToUnified(usthingSlots []usthing.USThingTimeSlot) []UnifiedTi
 		}
 		unifiedSlots = append(unifiedSlots, unifiedSlot)
 	}
-
 	return unifiedSlots
 }
 
@@ -48,33 +46,64 @@ func GetNextWeekSameDay() string {
 	return nextWeek.Format("2006-01-02")
 }
 
+// getDefaultFacilityIDs 从环境变量或使用默认值
+func getDefaultFacilityIDs() []string {
+	ids := os.Getenv("USTHING_FACILITY_IDS")
+	if ids != "" {
+		return splitAndTrim(ids, ",")
+	}
+	return []string{"2", "3", "4", "5", "79", "80", "100", "101"}
+}
+
+func splitAndTrim(s, sep string) []string {
+	parts := make([]string, 0)
+	for _, p := range splitStr(s, sep) {
+		p = trim(p)
+		if p != "" {
+			parts = append(parts, p)
+		}
+	}
+	return parts
+}
+
+func splitStr(s, sep string) []string {
+	var result []string
+	start := 0
+	for i := 0; i < len(s); i++ {
+		if string(s[i]) == sep {
+			result = append(result, s[start:i])
+			start = i + 1
+		}
+	}
+	result = append(result, s[start:])
+	return result
+}
+
+func trim(s string) string {
+	for len(s) > 0 && (s[0] == ' ' || s[0] == '\t') {
+		s = s[1:]
+	}
+	for len(s) > 0 && (s[len(s)-1] == ' ' || s[len(s)-1] == '\t') {
+		s = s[:len(s)-1]
+	}
+	return s
+}
+
 // UpdateTimeSlots 获取所有场地下周同一天的时间段，并转换为统一格式
 func UpdateTimeSlots() ([]UnifiedTimeSlot, error) {
-	// 定义需要循环的场地 ID
-	facilityIDs := []string{"2", "3", "4", "5", "79", "80", "100", "101"}
-
-	// 存放所有合并的时间段
+	facilityIDs := getDefaultFacilityIDs()
 	var allUSThingSlots []usthing.USThingTimeSlot
 
-	// 获取当前日期
 	toDay := time.Now().Format("2006-01-02")
-
-	// 获取下周同一天的日期
 	nextWeekDate := GetNextWeekSameDay()
 
-	// 遍历每个场地 ID，获取时间段并合并
 	for _, facilityID := range facilityIDs {
 		slots, err := usthing.GetAvailableTimeSlots("", "01", facilityID, toDay, nextWeekDate)
-		//slots, err := alumni.GetAvailableTimeSlots(facilityID, toDay, nextWeekDate)
 		if err != nil {
 			return nil, fmt.Errorf("error fetching timeslots for facility %s: %v", facilityID, err)
 		}
-
-		// 合并时间段
-		//allAlumniSlots = append(allAlumniSlots, slots...)
 		allUSThingSlots = append(allUSThingSlots, slots...)
 	}
 
-	// 将合并的所有时间段转换为 UnifiedTimeSlot
 	return ConvertUSThingToUnified(allUSThingSlots), nil
 }

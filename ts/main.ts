@@ -3,7 +3,7 @@ import {
   updateJiushiTimeSlots,
 } from "./service/updateTimeSlots";
 import { PushDeerService } from "./notifications/pushdeer";
-import { acquireToken, clearTokenCache } from "./sources/usthing";
+import { acquireToken, clearTokenCache, setCredentials } from "./sources/usthing";
 import {
   UnifiedTimeSlot,
   PushDeerConfig,
@@ -88,6 +88,8 @@ async function resolveUSThingBearer(
   const username = env.USTHING_USERNAME?.trim();
   const password = env.USTHING_PASSWORD?.trim();
   if (username && password) {
+    // 缓存凭据以便后续 401 自动刷新
+    setCredentials(username, password);
     try {
       const token = await acquireToken(username, password);
       return `Bearer ${token}`;

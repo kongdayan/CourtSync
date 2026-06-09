@@ -15,7 +15,7 @@ import (
 
 // TokenManager 管理 Azure AD token 的获取与刷新
 type TokenManager struct {
-	mu         sync.Mutex
+	mu          sync.Mutex
 	accessToken string
 	expiresAt   time.Time
 	username    string
@@ -40,11 +40,18 @@ func SetCredentials(username, password string) {
 	defaultTokenManager.accessToken = "" // 强制重新获取
 }
 
+// ForceRefresh 强制刷新 token（当 API 返回 401 时调用）
+func ForceRefresh() {
+	defaultTokenManager.mu.Lock()
+	defer defaultTokenManager.mu.Unlock()
+	defaultTokenManager.accessToken = ""
+	log.Println("[Auth] Token cache cleared — will re-acquire on next request")
+}
+
 func (tm *TokenManager) getAccessToken() (string, error) {
 	tm.mu.Lock()
 	defer tm.mu.Unlock()
 
-	// 如果 token 还有 5 分钟以上有效期，直接返回
 	if tm.accessToken != "" && time.Now().Add(5*time.Minute).Before(tm.expiresAt) {
 		return tm.accessToken, nil
 	}
@@ -106,7 +113,7 @@ func GetAccessToken() (string, error) {
 	return defaultTokenManager.getAccessToken()
 }
 
-// generateHeaders 生成通用的 HTTP 请求头
+// generateHeaders 生成 HTTP 请求头
 func generateHeaders() (http.Header, error) {
 	token, err := defaultTokenManager.getAccessToken()
 	if err != nil {
@@ -122,7 +129,67 @@ func generateHeaders() (http.Header, error) {
 	return headers, nil
 }
 
-// USThingTimeSlot 结构体用于解析 JSON 返回的场地时间段信息
+// isAuthError 判断响应是否为 token 过期
+func isAuthError(statusCode int, body []byte) bool {
+	if statusCode == http.StatusUnauthorized {
+		return true
+	}
+	bodyStr := string(body)
+	return strings.Contains(bodyStr, "jwt malformed") ||
+		strings.Contains(bodyStr, "JsonWebTokenError") ||
+		strings.Contains(bodyStr, "Missing Authorization Header")
+}
+
+// doWithAuthRetry 执行 HTTP 请求，若遇到 401 则自动刷新 token 并重试一次
+func doWithAuthRetry(req *http.Request) (*http.Response, error) {
+	client := &http.Client{Timeout: 15 * time.Second}
+
+	// 第一次尝试
+	headers, err := generateHeaders()
+	if err != nil {
+		return nil, err
+	}
+	req.Header = headers
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	// 如果不是 401，直接返回
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+
+	if !isAuthError(resp.StatusCode, body) {
+		// 重建 body reader 以便调用方读取
+		resp.Body = io.NopCloser(strings.NewReader(string(body)))
+		return resp, nil
+	}
+
+	log.Printf("[Auth] Received %d from API, refreshing token and retrying...", resp.StatusCode)
+
+	// 强制刷新 token
+	ForceRefresh()
+
+	// 重试
+	headers, err = generateHeaders()
+	if err != nil {
+		return nil, err
+	}
+	req.Header = headers
+
+	resp2, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("retry after token refresh failed: %v", err)
+	}
+
+	log.Printf("[Auth] Retry completed with status %d", resp2.StatusCode)
+	return resp2, nil
+}
+
+// ---- 数据结构 ----
+
+// USThingTimeSlot 场地时间段
 type USThingTimeSlot struct {
 	FacilityID     int    `json:"facilityID"`
 	TimeslotDate   string `json:"timeslotDate"`
@@ -132,7 +199,7 @@ type USThingTimeSlot struct {
 	ActivityName   string `json:"activityName"`
 }
 
-// USThingTimeslotResponse 结构体用于解析扫场请求的 JSON 响应
+// USThingTimeslotResponse 时段查询响应
 type USThingTimeslotResponse struct {
 	Status     string            `json:"status"`
 	Message    string            `json:"message"`
@@ -145,7 +212,7 @@ type USThingTimeslotResponse struct {
 	TimeSlots  []USThingTimeSlot `json:"timeslot"`
 }
 
-// USThingBookingResponse 结构体用于解析 Booking 请求的 JSON 响应
+// USThingBookingResponse 预订响应
 type USThingBookingResponse struct {
 	Status        string        `json:"status"`
 	Message       string        `json:"message"`
@@ -172,12 +239,12 @@ type USThingFacility struct {
 
 // USThingFacilityResponse 设施列表响应
 type USThingFacilityResponse struct {
-	Status      string             `json:"status"`
-	Message     string             `json:"message"`
-	TotalRecord int                `json:"totalRecord"`
-	UserType    string             `json:"userType"`
-	UstID       string             `json:"ustID"`
-	Facilities  []USThingFacility  `json:"facility"`
+	Status      string            `json:"status"`
+	Message     string            `json:"message"`
+	TotalRecord int               `json:"totalRecord"`
+	UserType    string            `json:"userType"`
+	UstID       string            `json:"ustID"`
+	Facilities  []USThingFacility `json:"facility"`
 }
 
 // USThingBookingInfo 预订信息
@@ -203,27 +270,19 @@ type USThingBookingInfoResponse struct {
 	Bookings    []USThingBookingInfo `json:"booking"`
 }
 
-// baseURL 是 MS API 网关
 const baseURL = "https://ms.api.usthing.xyz"
+
+// ---- API 函数（全部使用 doWithAuthRetry 自动刷新） ----
 
 // GetFacilities 获取所有设施列表 (v3)
 func GetFacilities() (*USThingFacilityResponse, error) {
-	url := baseURL + "/v3/msapi/fbs/facilities"
-	log.Printf("[Facilities] GET %s", url)
-
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", baseURL+"/v3/msapi/fbs/facilities", nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %v", err)
 	}
+	log.Printf("[Facilities] GET %s", req.URL.String())
 
-	headers, err := generateHeaders()
-	if err != nil {
-		return nil, fmt.Errorf("error generating headers: %v", err)
-	}
-	req.Header = headers
-
-	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := doWithAuthRetry(req)
 	if err != nil {
 		return nil, fmt.Errorf("error sending request: %v", err)
 	}
@@ -265,14 +324,7 @@ func GetAvailableTimeSlots(ustID, userType, facilityID, startDate, endDate strin
 		return nil, fmt.Errorf("error creating request: %v", err)
 	}
 
-	headers, err := generateHeaders()
-	if err != nil {
-		return nil, fmt.Errorf("error generating headers: %v", err)
-	}
-	req.Header = headers
-
-	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := doWithAuthRetry(req)
 	if err != nil {
 		return nil, fmt.Errorf("error sending request: %v", err)
 	}
@@ -290,20 +342,17 @@ func GetAvailableTimeSlots(ustID, userType, facilityID, startDate, endDate strin
 		return nil, fmt.Errorf("error parsing response: %v", err)
 	}
 
-	// 处理系统关闭 (errorCode 03)
 	if response.ErrorCode == "03" {
 		log.Printf("[Timeslot] System closed: %s", response.Message)
 		return nil, fmt.Errorf("system closed: %s", response.Message)
 	}
 
 	if response.Status != "200" {
-		log.Printf("[Timeslot] Non-200 status: %s, message: %s", response.Status, response.Message)
 		return nil, fmt.Errorf("unexpected status: %s, message: %s", response.Status, response.Message)
 	}
 
 	log.Printf("[Timeslot] Got %d timeslots", len(response.TimeSlots))
 
-	// 过滤 Available 时段
 	availableSlots := make([]USThingTimeSlot, 0)
 	for _, slot := range response.TimeSlots {
 		if slot.TimeslotStatus == "Available" {
@@ -324,8 +373,7 @@ func GetBookingInfo(ustID, userType string) (*USThingBookingInfoResponse, error)
 		userType = "01"
 	}
 
-	url := fmt.Sprintf("%s/v3/msapi/fbs/bookingInfo?ustID=%s&userType=%s",
-		baseURL, ustID, userType)
+	url := fmt.Sprintf("%s/v3/msapi/fbs/bookingInfo?ustID=%s&userType=%s", baseURL, ustID, userType)
 	log.Printf("[BookingInfo] GET %s", url)
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -333,14 +381,7 @@ func GetBookingInfo(ustID, userType string) (*USThingBookingInfoResponse, error)
 		return nil, fmt.Errorf("error creating request: %v", err)
 	}
 
-	headers, err := generateHeaders()
-	if err != nil {
-		return nil, fmt.Errorf("error generating headers: %v", err)
-	}
-	req.Header = headers
-
-	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := doWithAuthRetry(req)
 	if err != nil {
 		return nil, fmt.Errorf("error sending request: %v", err)
 	}
@@ -360,7 +401,7 @@ func GetBookingInfo(ustID, userType string) (*USThingBookingInfoResponse, error)
 	return &response, nil
 }
 
-// Booking 预订/取消场地 (v2 — 此端点仍有效)
+// Booking 预订/取消场地 (v2)
 func Booking(ustID, userType, facilityID, timeslotDate, startTime, endTime, cancelInd string) (*USThingBookingResponse, error) {
 	if ustID == "" {
 		ustID = os.Getenv("USTHING_UST_ID")
@@ -375,14 +416,7 @@ func Booking(ustID, userType, facilityID, timeslotDate, startTime, endTime, canc
 		return nil, fmt.Errorf("error creating request: %v", err)
 	}
 
-	headers, err := generateHeaders()
-	if err != nil {
-		return nil, fmt.Errorf("error generating headers: %v", err)
-	}
-	req.Header = headers
-
-	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := doWithAuthRetry(req)
 	if err != nil {
 		return nil, fmt.Errorf("error sending request: %v", err)
 	}

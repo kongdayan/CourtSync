@@ -31,16 +31,23 @@ interface AzureTokenResponse {
 
 let cachedToken: { accessToken: string; expiresAt: number } | null = null;
 
+let cachedCredentials: { username: string; password: string } | null = null;
+
+/** 设置用于自动刷新的凭据 */
+export function setCredentials(username: string, password: string): void {
+  cachedCredentials = { username, password };
+}
+
 /**
- * 通过 Azure AD ROPC 获取 access token。建议在 Worker 中通过 secrets 传入凭据。
+ * 通过 Azure AD ROPC 获取 access token。
+ * 若 force=true 则跳过缓存强制刷新。
  */
 export async function acquireToken(
   username: string,
   password: string,
-  options: { fetchImpl?: typeof fetch } = {}
+  options: { fetchImpl?: typeof fetch; force?: boolean } = {}
 ): Promise<string> {
-  // 检查缓存
-  if (cachedToken && Date.now() + 5 * 60 * 1000 < cachedToken.expiresAt) {
+  if (!options.force && cachedToken && Date.now() + 5 * 60 * 1000 < cachedToken.expiresAt) {
     return cachedToken.accessToken;
   }
 
@@ -76,14 +83,95 @@ export async function acquireToken(
     accessToken: data.access_token,
     expiresAt: Date.now() + data.expires_in * 1000,
   };
+  cachedCredentials = { username, password };
 
   console.log(`[Auth] Token refreshed, expires in ${data.expires_in}s`);
   return data.access_token;
 }
 
-/** 清除缓存的 token（用于凭据变更时） */
+/** 清除缓存 token（强制下次请求重新获取） */
 export function clearTokenCache(): void {
   cachedToken = null;
+}
+
+/**
+ * 强制刷新 token — 当 API 返回 401 时调用。
+ * 模拟 App 行为：清除过期 token，用已缓存的凭据重新获取。
+ */
+export async function forceRefreshToken(
+  options: { fetchImpl?: typeof fetch } = {}
+): Promise<string> {
+  clearTokenCache();
+  if (!cachedCredentials) {
+    throw new Error(
+      "Cannot refresh token: no cached credentials. Call setCredentials() or acquireToken() first."
+    );
+  }
+  return acquireToken(cachedCredentials.username, cachedCredentials.password, {
+    ...options,
+    force: true,
+  });
+}
+
+// ---- Auth retry helper ----
+
+function isAuthError(status: number, body: string): boolean {
+  if (status === 401) return true;
+  const lower = body.toLowerCase();
+  return (
+    lower.includes("jwt malformed") ||
+    lower.includes("jsonwebtokenerror") ||
+    lower.includes("missing authorization header")
+  );
+}
+
+/**
+ * fetchWithAuthRetry 包装 fetch，检测 401 → 自动刷新 token → 重试一次。
+ * 完全模仿 App 的 token 过期自动刷新行为。
+ */
+async function fetchWithAuthRetry(
+  url: string,
+  init: RequestInit,
+  bearer?: string,
+  fetchImpl: typeof fetch = fetch
+): Promise<Response> {
+  // 动态注入最新 token
+  const makeHeaders = () => {
+    // 每次都重新 build headers，确保 token 是最新的
+    return buildHeaders(bearer);
+  };
+
+  const req: RequestInit = { ...init, headers: makeHeaders() };
+
+  let response = await fetchImpl(url, req);
+
+  if (!isAuthError(response.status, "")) {
+    return response;
+  }
+
+  // 401 — 读取 body 二次确认
+  const clonedBody = await response.clone().text();
+  if (!isAuthError(response.status, clonedBody)) {
+    return response;
+  }
+
+  console.log(
+    `[Auth] Received ${response.status} from API, refreshing token and retrying...`
+  );
+
+  try {
+    bearer = await forceRefreshToken({ fetchImpl });
+  } catch (e) {
+    console.error("[Auth] Token refresh failed:", e);
+    return response; // 返回原始 401，让调用方处理
+  }
+
+  // 重试
+  console.log("[Auth] Retrying request with refreshed token...");
+  req.headers = makeHeaders();
+  response = await fetchImpl(url, req);
+  console.log(`[Auth] Retry completed with status ${response.status}`);
+  return response;
 }
 
 // ---- Response types (internal) ----
@@ -92,11 +180,6 @@ interface USThingTimeslotResponse {
   status: string;
   message: string;
   errorCode?: string;
-  facilityID: number;
-  userType: string;
-  ustID: string;
-  startDate: string;
-  endDate: string;
   timeslot: USThingTimeSlot[];
 }
 
@@ -121,8 +204,6 @@ interface USThingFacilityResponse {
   status: string;
   message: string;
   totalRecord: number;
-  userType: string;
-  ustID: string;
   facility: USThingFacility[];
 }
 
@@ -131,13 +212,10 @@ interface USThingBookingInfoResponse {
   message: string;
   errorCode: string;
   totalRecord: number;
-  userType: string;
-  ustID: string;
-  emailAddr: string;
   booking: USThingBookingInfo[];
 }
 
-// ---- API Functions ----
+// ---- API Functions (all use fetchWithAuthRetry) ----
 
 /** 获取所有设施列表 (v3) */
 export async function getFacilities(
@@ -145,19 +223,18 @@ export async function getFacilities(
 ): Promise<USThingFacility[]> {
   const { fetchImpl = fetch, bearer } = options;
   const url = "https://ms.api.usthing.xyz/v3/msapi/fbs/facilities";
-
   console.log("[USThing] GET facilities");
 
-  const response = await fetchImpl(url, {
-    method: "GET",
-    headers: buildHeaders(bearer),
-  });
+  const response = await fetchWithAuthRetry(
+    url,
+    { method: "GET" },
+    bearer,
+    fetchImpl
+  );
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(
-      `USThing facilities failed with ${response.status}: ${text}`
-    );
+    throw new Error(`USThing facilities failed with ${response.status}: ${text}`);
   }
 
   const data = (await response.json()) as USThingFacilityResponse;
@@ -189,16 +266,16 @@ export async function getAvailableTimeSlots(
     `[USThing] GET facilityTimeslot facility=${facilityID} range=${startDate}→${endDate}`
   );
 
-  const response = await fetchImpl(url, {
-    method: "GET",
-    headers: buildHeaders(bearer),
-  });
+  const response = await fetchWithAuthRetry(
+    url,
+    { method: "GET" },
+    bearer,
+    fetchImpl
+  );
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(
-      `USThing timeslot failed with ${response.status}: ${text}`
-    );
+    throw new Error(`USThing timeslot failed with ${response.status}: ${text}`);
   }
 
   const data = (await response.json()) as USThingTimeslotResponse;
@@ -227,16 +304,16 @@ export async function getBookingInfo(
 
   console.log("[USThing] GET bookingInfo");
 
-  const response = await fetchImpl(url, {
-    method: "GET",
-    headers: buildHeaders(bearer),
-  });
+  const response = await fetchWithAuthRetry(
+    url,
+    { method: "GET" },
+    bearer,
+    fetchImpl
+  );
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(
-      `USThing bookingInfo failed with ${response.status}: ${text}`
-    );
+    throw new Error(`USThing bookingInfo failed with ${response.status}: ${text}`);
   }
 
   const data = (await response.json()) as USThingBookingInfoResponse;
@@ -274,16 +351,16 @@ export async function booking(
     `[USThing] POST book facility=${facilityID} ${timeslotDate} ${startTime}-${endTime} cancelInd=${cancelInd}`
   );
 
-  const response = await fetchImpl(url, {
-    method: "POST",
-    headers: buildHeaders(bearer),
-  });
+  const response = await fetchWithAuthRetry(
+    url,
+    { method: "POST" },
+    bearer,
+    fetchImpl
+  );
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(
-      `USThing booking failed with ${response.status}: ${text}`
-    );
+    throw new Error(`USThing booking failed with ${response.status}: ${text}`);
   }
 
   const data = (await response.json()) as USThingBookingResponse;
@@ -293,7 +370,9 @@ export async function booking(
   }
 
   console.log(
-    `[USThing] Booking ${cancelInd === "Y" ? "cancelled" : "created"}, bookingRef=${data.bookingRef}`
+    `[USThing] Booking ${
+      cancelInd === "Y" ? "cancelled" : "created"
+    }, bookingRef=${data.bookingRef}`
   );
   return data;
 }

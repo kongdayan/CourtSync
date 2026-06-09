@@ -12,14 +12,50 @@ export default {
     const url = new URL(request.url);
 
     // Handle Better Auth /api/auth/** at the Worker level.
-    // baseURL is set to APP_BASE_URL/api/auth so basePath strips correctly.
     if (url.pathname.startsWith("/api/auth")) {
       try {
         const auth = createAuth(env);
-        return auth.handler(request);
+        const handlerRes = await auth.handler(request);
+        // Log for debugging
+        console.log(JSON.stringify({
+          authPath: url.pathname,
+          authMethod: request.method,
+          authStatus: handlerRes.status,
+          authHeaders: Object.fromEntries(handlerRes.headers.entries()),
+        }));
+        return handlerRes;
       } catch (err: any) {
         console.error("[Auth] error:", err?.message || String(err));
-        return new Response("Auth error", { status: 500 });
+        return new Response(`Auth error: ${err?.message || "unknown"}`, { status: 500 });
+      }
+    }
+
+    // Diagnostic: test Better Auth initialization
+    if (url.pathname === "/api/debug/auth-init") {
+      try {
+        const auth = createAuth(env);
+        const dbType = typeof env.APP_DB;
+        const dbKeys = env.APP_DB ? Object.keys(env.APP_DB).slice(0, 10) : [];
+        const prepared = env.APP_DB ? "prepare" in env.APP_DB : false;
+        // Test DB query
+        let dbOk = false;
+        try {
+          const result = await env.APP_DB.prepare("SELECT 1 as ok").first<{ ok: number }>();
+          dbOk = result?.ok === 1;
+        } catch {}
+        // Test handler
+        const testReq = new Request("https://sports.hunao.online/api/auth/sign-in/social?provider=google&callbackURL=%2F");
+        const res = await auth.handler(testReq);
+        const body = await res.text().catch(() => "");
+        return Response.json({
+          dbType, dbKeys, prepared, dbOk,
+          handlerStatus: res.status,
+          handlerBody: body.slice(0, 300),
+          configBaseURL: auth.options?.baseURL ?? "unknown",
+          secretLen: env.BETTER_AUTH_SECRET?.length ?? 0,
+        });
+      } catch (e: any) {
+        return Response.json({ error: e.message, stack: e.stack?.slice(0, 500) }, { status: 500 });
       }
     }
 

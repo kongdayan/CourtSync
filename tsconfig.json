@@ -5,8 +5,7 @@
     "moduleResolution": "Bundler",
     "types": [
       "./worker-configuration.d.ts",
-      "vite/client",
-      "@cloudflare/vitest-pool-workers/types"
+      "vite/client"
     ],
     "strict": true,
     "moduleDetection": "force",
@@ -25,8 +24,6 @@
     "ts/**/*.ts",
     "src/**/*.ts",
     "src/**/*.tsx",
-    "test/**/*.ts",
-    "test/**/*.tsx",
     "vite.config.ts",
     "vitest.config.ts",
     "vitest.web.config.ts",

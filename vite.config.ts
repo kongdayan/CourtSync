@@ -5,7 +5,7 @@ import { fileURLToPath, URL } from "node:url";
 import { defineConfig } from "vite";
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), cloudflare()],
+  plugins: [react(), tailwindcss(), cloudflare({ configPath: "./wrangler.jsonc" })],
   resolve: {
     alias: {
       "@web": fileURLToPath(new URL("./src/web", import.meta.url)),

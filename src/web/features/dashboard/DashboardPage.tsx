@@ -338,7 +338,7 @@ export function DashboardPage() {
                                       return (
                                         <span
                                           key={fid}
-                                          className={`h-3 w-full rounded-sm ${statusRect(s.Status)}`}
+                                          className={`block h-4 w-full rounded-sm cursor-pointer ${statusRect(s.Status)}`}
                                           title={`${resolveFacilityName(fid, sourceKey)}: ${statusLabel(s.Status)}`}
                                         />
                                       );

@@ -8,6 +8,7 @@ import { channelsRoutes } from "./routes/channels";
 import { rulesRoutes } from "./routes/rules";
 import { slotsRoutes } from "./routes/slots";
 import { adminUsersRoutes } from "./routes/admin-users";
+import { adminDiagnosticsRoutes } from "./routes/admin-diagnostics";
 import {
   createSessionMiddleware,
   type AuthVariables,
@@ -83,7 +84,8 @@ export function createApp(deps?: AppDependencies) {
     .use(sessionMiddleware)
     .use(activeUserMiddleware)
     .use(adminMiddleware)
-    .route("/", adminUsersRoutes);
+    .route("/", adminUsersRoutes)
+    .route("/", adminDiagnosticsRoutes);
 
   return new Hono<{ Bindings: Env; Variables: AuthVariables }>()
     .basePath("/api")

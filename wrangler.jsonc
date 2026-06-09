@@ -80,7 +80,8 @@
       "USTHING_BEARER",
       "JIUSHI_PROXY_URL",
       "JIUSHI_PROXY_TOKEN",
-      "JIUSHI_COOKIE"
+      "JIUSHI_COOKIE",
+      "ADMIN_PUSHDEER_KEY"
     ]
   }
 }

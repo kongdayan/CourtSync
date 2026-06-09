@@ -4,13 +4,15 @@ import { createAuth } from "../auth/config";
 import { parseAdminEmails } from "../auth/admin-emails";
 import { healthRoutes } from "./routes/health";
 import { meRoutes } from "./routes/me";
+import { channelsRoutes } from "./routes/channels";
 import { rulesRoutes } from "./routes/rules";
 import { slotsRoutes } from "./routes/slots";
+import { adminUsersRoutes } from "./routes/admin-users";
 import {
   createSessionMiddleware,
   type AuthVariables,
 } from "./middleware/session";
-import { activeUserMiddleware } from "./middleware/access";
+import { activeUserMiddleware, adminMiddleware } from "./middleware/access";
 import { sameOriginJsonMiddleware } from "./middleware/same-origin";
 import type { UserAccess } from "../app-db/types";
 
@@ -73,7 +75,15 @@ export function createApp(deps?: AppDependencies) {
     .use(activeUserMiddleware)
     .use(sameOriginJsonMiddleware)
     .route("/", rulesRoutes)
+    .route("/", channelsRoutes)
     .get("/protected", (c) => c.json({ ok: true }));
+
+  // Admin route group — full middleware stack (session + active user + admin role).
+  const adminApp = new Hono<{ Bindings: Env; Variables: AuthVariables }>()
+    .use(sessionMiddleware)
+    .use(activeUserMiddleware)
+    .use(adminMiddleware)
+    .route("/", adminUsersRoutes);
 
   return new Hono<{ Bindings: Env; Variables: AuthVariables }>()
     .basePath("/api")
@@ -85,5 +95,6 @@ export function createApp(deps?: AppDependencies) {
     .route("/", healthRoutes)
     .route("/", slotsRoutes)
     .route("/", authenticated)
+    .route("/", adminApp)
     .notFound((c) => c.json({ error: "not_found" }, 404));
 }

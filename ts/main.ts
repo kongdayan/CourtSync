@@ -15,18 +15,10 @@ export default {
     if (url.pathname.startsWith("/api/auth")) {
       try {
         const auth = createAuth(env);
-        // Construct a fresh request to ensure clean state
-        const authReq = new Request(`https://sports.hunao.online${url.pathname}${url.search}`, {
-          method: request.method,
-          headers: request.headers,
-          body: request.body,
-          redirect: "manual",
-        });
-        const res = await auth.handler(authReq);
-        return res;
+        return auth.handler(request);
       } catch (err: any) {
         console.error("[Auth] error:", err?.message || String(err));
-        return new Response(`Auth error: ${err?.message || "unknown"}`, { status: 500 });
+        return new Response("Auth error", { status: 500 });
       }
     }
 

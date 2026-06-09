@@ -1,4 +1,4 @@
-import { authClient } from "../../lib/auth-client";
+import { signInWithGooglePopup } from "../../lib/auth-client";
 
 export function LoginPage() {
   return (
@@ -7,7 +7,7 @@ export function LoginPage() {
         <h1 className="text-2xl font-bold">CourtSync</h1>
         <p className="text-muted-foreground">登录以管理通知规则</p>
         <button
-          onClick={() => authClient.signIn.social({ provider: "google", callbackURL: "/account" })}
+          onClick={() => void signInWithGooglePopup("/account")}
           className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-3 text-white hover:bg-blue-700"
         >
           使用 Google 账号登录

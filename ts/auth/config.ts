@@ -1,23 +1,11 @@
 import { betterAuth } from "better-auth";
-import { withCloudflare } from "better-auth-cloudflare";
 
 export function createAuth(env: Env) {
-  const cloudflareCfg = withCloudflare(
-    {
-      d1Native: env.APP_DB,
-      autoDetectIpAddress: false,
-      geolocationTracking: false,
-    },
-    {
-      database: env.APP_DB,
-    },
-  );
-
   return betterAuth({
     appName: "CourtSync",
     baseURL: `${env.APP_BASE_URL}/api/auth`,
     secret: env.BETTER_AUTH_SECRET,
-    database: cloudflareCfg.database,
+    database: env.APP_DB,
     socialProviders: {
       google: {
         clientId: env.GOOGLE_CLIENT_ID,

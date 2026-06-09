@@ -1,6 +1,7 @@
 import { createBrowserRouter } from "react-router-dom";
 import { DashboardPage } from "../features/dashboard/DashboardPage";
 import { LoginPage } from "../features/auth/LoginPage";
+import { PopupCompletePage } from "../features/auth/PopupCompletePage";
 import { AccountPage } from "../features/account/AccountPage";
 import { RulesPage } from "../features/rules/RulesPage";
 import { RuleEditorPage } from "../features/rules/RuleEditorPage";
@@ -11,6 +12,7 @@ import { RequireAccess } from "../features/auth/RequireAccess";
 export const router = createBrowserRouter([
   { path: "/", element: <DashboardPage /> },
   { path: "/login", element: <LoginPage /> },
+  { path: "/auth/popup-complete", element: <PopupCompletePage /> },
   { path: "/account", element: <AccountPage /> },
   {
     element: <RequireAccess status="active" />,

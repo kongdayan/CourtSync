@@ -1,46 +1,11 @@
-import {
-  updateUSThingTimeSlots,
-  updateJiushiTimeSlots,
-} from "./service/updateTimeSlots";
-import { PushDeerService } from "./notifications/pushdeer";
-import { acquireToken, clearTokenCache, setCredentials } from "./sources/usthing";
-import {
-  UnifiedTimeSlot,
-  PushDeerConfig,
-  USThingConfig,
-  JiushiConfig,
-  DataSourceKey,
-} from "./types";
+import { DataSourceKey } from "./types";
 import { getTodayUTC8, getDateDaysAhead } from "./utils/time";
 import { renderSlotsTable } from "./views/table";
-import { persistSlots, loadSlots } from "./db/slots";
-
-export interface WorkerEnv {
-  DB: D1Database;
-  JIUSHI_DB?: D1Database;
-  hkust_token?: KVNamespace;
-  PUSHDEER_KEYS?: string;
-  USTHING_UST_ID?: string;
-  USTHING_USER_TYPE?: string;
-  USTHING_FACILITY_IDS?: string;
-  USTHING_BEARER?: string;
-  /** Azure AD username for dynamic token (ROPC) */
-  USTHING_USERNAME?: string;
-  /** Azure AD password for dynamic token (ROPC) */
-  USTHING_PASSWORD?: string;
-  TOKEN_ADMIN_SECRET?: string;
-  JIUSHI_VENUE_ID?: string;
-  JIUSHI_GROUND_IDS?: string;
-  JIUSHI_MAX_DAYS?: string;
-  JIUSHI_PROXY_URL?: string;
-  JIUSHI_PROXY_TOKEN?: string;
-  JIUSHI_COOKIE?: string;
-}
-
-const USTHING_BEARER_KV_KEY = "usthing:bearer";
+import { loadSlots } from "./db/slots";
+import { runTimeslotSync, AVAILABLE_SOURCES } from "./sync/run";
+import { createApp } from "./http/app";
 
 const DEFAULT_DATA_SOURCE: DataSourceKey = "usthing";
-const AVAILABLE_SOURCES: DataSourceKey[] = ["usthing", "jiushi"];
 
 function normalizeDataSource(value: string | null | undefined): DataSourceKey {
   const normalized = value?.trim().toLowerCase();
@@ -48,84 +13,6 @@ function normalizeDataSource(value: string | null | undefined): DataSourceKey {
     return "jiushi";
   }
   return DEFAULT_DATA_SOURCE;
-}
-
-export interface TimeslotSyncResult {
-  source: DataSourceKey;
-  slots: UnifiedTimeSlot[];
-  warnings: string[];
-  startDate: string;
-  endDate: string;
-  generatedAt: Date;
-}
-
-function parsePushConfig(env?: WorkerEnv): PushDeerConfig | null {
-  const rawKeys = env?.PUSHDEER_KEYS;
-  if (!rawKeys) {
-    return null;
-  }
-
-  const pushKeys = rawKeys
-    .split(",")
-    .map((key) => key.trim())
-    .filter(Boolean);
-
-  if (!pushKeys.length) {
-    return null;
-  }
-
-  return { pushKeys };
-}
-
-async function resolveUSThingBearer(
-  env: WorkerEnv,
-  warnings: string[]
-): Promise<string | undefined> {
-  // 优先使用静态 bearer（向后兼容）
-  const inlineBearer = env.USTHING_BEARER?.trim();
-  if (inlineBearer) {
-    return inlineBearer;
-  }
-
-  // 尝试 Azure AD 动态获取 token
-  const username = env.USTHING_USERNAME?.trim();
-  const password = env.USTHING_PASSWORD?.trim();
-  if (username && password) {
-    // 缓存凭据以便后续 401 自动刷新
-    setCredentials(username, password);
-    try {
-      const token = await acquireToken(username, password);
-      return `Bearer ${token}`;
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      warnings.push(`Azure AD token acquisition failed: ${msg}`);
-      console.error("Azure AD token error", error);
-    }
-  }
-
-  // 回退到 KV 中存储的 token
-  if (!env.hkust_token) {
-    warnings.push(
-      "USThing bearer token is not configured. Set USTHING_USERNAME+USTHING_PASSWORD for Azure AD auto-auth, USTHING_BEARER for a static token, or configure KV."
-    );
-    return undefined;
-  }
-
-  try {
-    const kvValue = await env.hkust_token.get(USTHING_BEARER_KV_KEY, "text");
-    const trimmed = kvValue?.trim();
-    if (trimmed) {
-      return trimmed;
-    }
-    warnings.push(
-      `USThing bearer token not found in KV namespace (binding "hkust_token", key "${USTHING_BEARER_KV_KEY}").`
-    );
-  } catch (error) {
-    console.error("Failed to read USThing bearer from KV", error);
-    warnings.push("Unable to read USThing bearer token from KV.");
-  }
-
-  return undefined;
 }
 
 function renderTokenAdminPage(params: {
@@ -184,7 +71,7 @@ function renderTokenAdminPage(params: {
 
 async function handleTokenAdminRequest(
   request: Request,
-  env: WorkerEnv
+  env: Env
 ): Promise<Response> {
   if (request.method === "GET") {
     return renderTokenAdminPage({});
@@ -225,7 +112,7 @@ async function handleTokenAdminRequest(
   }
 
   try {
-    await env.hkust_token.put(USTHING_BEARER_KV_KEY, token);
+    await env.hkust_token.put("usthing:bearer", token);
   } catch (error) {
     console.error("Failed to write token to KV", error);
     return renderTokenAdminPage({
@@ -238,226 +125,10 @@ async function handleTokenAdminRequest(
   });
 }
 
-async function parseUSThingConfig(
-  env: WorkerEnv,
-  warnings: string[]
-): Promise<USThingConfig> {
-  const ustID = env?.USTHING_UST_ID?.trim() ?? "";
-  const userType = env?.USTHING_USER_TYPE?.trim() ?? "01";
-
-  const facilityIDs =
-    env?.USTHING_FACILITY_IDS
-      ?.split(",")
-      .map((id) => id.trim())
-      .filter(Boolean) ?? ["2", "3", "4", "5", "79", "80", "100", "101"];
-
-  return {
-    ustID,
-    userType,
-    facilityIDs,
-    bearer: await resolveUSThingBearer(env, warnings),
-  };
-}
-
-function parseJiushiConfig(
-  env: WorkerEnv,
-  warnings: string[]
-): JiushiConfig | null {
-  const venueId = env?.JIUSHI_VENUE_ID?.trim() ?? "";
-  if (!venueId) {
-    warnings.push(
-      "Jiushi venue ID is not configured. Set the JIUSHI_VENUE_ID environment variable to enable Jiushi sync."
-    );
-    return null;
-  }
-
-  const allowedGroundIds =
-    env?.JIUSHI_GROUND_IDS
-      ?.split(",")
-      .map((item) => item.trim())
-      .filter(Boolean) ?? [];
-
-  const parsedMaxDays = Number.parseInt(env?.JIUSHI_MAX_DAYS ?? "", 10);
-  const maxDays = Number.isFinite(parsedMaxDays) && parsedMaxDays > 0
-    ? Math.min(parsedMaxDays, 31)
-    : 9;
-
-  return {
-    venueId,
-    allowedGroundIds,
-    maxDays,
-    proxyUrl: env?.JIUSHI_PROXY_URL?.trim() || undefined,
-    proxyToken: env?.JIUSHI_PROXY_TOKEN?.trim() || undefined,
-    cookie: env?.JIUSHI_COOKIE?.trim() || undefined,
-  };
-}
-
-async function runUSThingTimeslotSync(
-  env: WorkerEnv,
-  fetchImpl: typeof fetch = fetch,
-  startDate?: string,
-  endDate?: string
-): Promise<TimeslotSyncResult> {
-  const effectiveStart = startDate ?? getTodayUTC8();
-  const effectiveEnd = endDate ?? getDateDaysAhead(14);
-  const warnings: string[] = [];
-  const usthingConfig = await parseUSThingConfig(env, warnings);
-
-  console.log(
-    `[USThing] Starting sync for facilities ${usthingConfig.facilityIDs.join(
-      ", "
-    )} from ${effectiveStart} to ${effectiveEnd} (ustID length: ${
-      usthingConfig.ustID.length
-    }, bearer provided: ${Boolean(usthingConfig.bearer)})`
-  );
-
-  const generatedAt = new Date();
-
-  const slots = await updateUSThingTimeSlots({
-    ustID: usthingConfig.ustID,
-    userType: usthingConfig.userType,
-    facilityIDs: usthingConfig.facilityIDs,
-    startDate: effectiveStart,
-    endDate: effectiveEnd,
-    bearer: usthingConfig.bearer,
-    fetchImpl,
-    warnings,
-  });
-
-  try {
-    await persistSlots(env.DB, slots, effectiveStart, effectiveEnd, generatedAt);
-  } catch (error) {
-    console.error("Failed to persist slot snapshot to D1", error);
-    warnings.push(
-      "Unable to persist slot data to D1. The dashboard may serve stale results."
-    );
-  }
-
-  const pushConfig = parsePushConfig(env);
-
-  if (!slots.length) {
-    const jwtWarning =
-      "USThing authorization token appears to be invalid or expired. Please contact the administrator to refresh the bearer JWT.";
-    if (!warnings.some((w) => w.toLowerCase().includes("jwt"))) {
-      warnings.push(jwtWarning);
-    }
-  }
-
-  if (pushConfig && slots.length > 0) {
-    console.log(
-      `[PushDeer] Dispatching ${slots.length} slots to ${pushConfig.pushKeys.length} keys`
-    );
-    const pushService = new PushDeerService(pushConfig.pushKeys);
-    await pushService.pushTimeSlots(slots, fetchImpl);
-  } else if (pushConfig) {
-    console.log(
-      "[PushDeer] Push configured but no slots available; skipping notification"
-    );
-  } else {
-    console.log("[PushDeer] No push configuration provided; skipping push");
-  }
-
-  if (!slots.length) {
-    console.warn("[USThing] No slots returned in this sync");
-  }
-
-  return {
-    source: "usthing",
-    slots,
-    warnings,
-    startDate: effectiveStart,
-    endDate: effectiveEnd,
-    generatedAt,
-  };
-}
-
-async function runJiushiTimeslotSync(
-  env: WorkerEnv,
-  fetchImpl: typeof fetch = fetch,
-  startDate?: string,
-  endDate?: string
-): Promise<TimeslotSyncResult> {
-  const effectiveStart = startDate ?? getTodayUTC8();
-  const effectiveEnd = endDate ?? getDateDaysAhead(14);
-  const warnings: string[] = [];
-  const config = parseJiushiConfig(env, warnings);
-  const generatedAt = new Date();
-
-  if (!config) {
-    return {
-      source: "jiushi",
-      slots: [],
-      warnings,
-      startDate: effectiveStart,
-      endDate: effectiveEnd,
-      generatedAt,
-    };
-  }
-
-  const slots = await updateJiushiTimeSlots({
-    venueId: config.venueId,
-    allowedGroundIds: config.allowedGroundIds,
-    startDate: effectiveStart,
-    endDate: effectiveEnd,
-    fetchImpl,
-    warnings,
-    maxDays: config.maxDays,
-    proxyUrl: config.proxyUrl,
-    proxyToken: config.proxyToken,
-  });
-
-  if (!env.JIUSHI_DB) {
-    warnings.push(
-      "Jiushi D1 binding (JIUSHI_DB) is not configured. Results cannot be persisted."
-    );
-  } else {
-    try {
-      await persistSlots(
-        env.JIUSHI_DB,
-        slots,
-        effectiveStart,
-        effectiveEnd,
-        generatedAt
-      );
-    } catch (error) {
-      console.error("Failed to persist Jiushi slot snapshot to D1", error);
-      warnings.push(
-        "Unable to persist Jiushi slot data to D1. The dashboard may serve stale results."
-      );
-    }
-  }
-
-  if (!slots.length) {
-    console.warn("[Jiushi] No slots returned in this sync");
-  }
-
-  return {
-    source: "jiushi",
-    slots,
-    warnings,
-    startDate: effectiveStart,
-    endDate: effectiveEnd,
-    generatedAt,
-  };
-}
-
-export async function runTimeslotSync(
-  source: DataSourceKey,
-  env: WorkerEnv,
-  fetchImpl: typeof fetch = fetch,
-  startDate?: string,
-  endDate?: string
-): Promise<TimeslotSyncResult> {
-  if (source === "jiushi") {
-    return runJiushiTimeslotSync(env, fetchImpl, startDate, endDate);
-  }
-  return runUSThingTimeslotSync(env, fetchImpl, startDate, endDate);
-}
-
 export default {
   async fetch(
     request: Request,
-    env: WorkerEnv,
+    env: Env,
     ctx: ExecutionContext
   ): Promise<Response> {
     const url = new URL(request.url);
@@ -466,127 +137,12 @@ export default {
       return handleTokenAdminRequest(request, env);
     }
 
-    if (request.method !== "GET") {
-      return new Response("Method Not Allowed", { status: 405 });
-    }
-
-    const source = normalizeDataSource(url.searchParams.get("source"));
-    const targetDb = source === "jiushi" ? env.JIUSHI_DB : env.DB;
-
-    const startDate = getTodayUTC8();
-    const endDate = getDateDaysAhead(14);
-    const forceRefresh = url.searchParams.get("refresh") === "1";
-    let warnings: string[] = [];
-    let generatedAt = new Date();
-
-    if (!targetDb) {
-      warnings.push(
-        source === "jiushi"
-          ? "Jiushi database binding (JIUSHI_DB) is not available. Live results will not be cached."
-          : "Primary database binding (DB) is not available. Live results will not be cached."
-      );
-    }
-
-    let { slots: dbSlots, latestUpdatedAt } = await loadSlots(
-      targetDb,
-      startDate,
-      endDate
-    );
-
-    if (dbSlots.length === 0 || forceRefresh) {
-      const syncResult = await runTimeslotSync(
-        source,
-        env,
-        fetch,
-        startDate,
-        endDate
-      );
-      warnings = warnings.concat(syncResult.warnings);
-      generatedAt = syncResult.generatedAt;
-      if (targetDb) {
-        const reload = await loadSlots(targetDb, startDate, endDate);
-        dbSlots = reload.slots;
-        latestUpdatedAt = reload.latestUpdatedAt ?? latestUpdatedAt;
-      } else {
-        dbSlots = syncResult.slots;
-        latestUpdatedAt = syncResult.generatedAt.toISOString();
-      }
-    }
-
-    if (latestUpdatedAt) {
-      const parsed = new Date(latestUpdatedAt);
-      if (!Number.isNaN(parsed.getTime())) {
-        generatedAt = parsed;
-      }
-    }
-
-    let displaySlots = dbSlots;
-    if (!displaySlots.length) {
-      warnings.push(
-        "No slot data is currently available. The D1 snapshot may be empty."
-      );
-    }
-
-    const format = url.searchParams.get("format");
-    const accept = request.headers.get("Accept") ?? "";
-    const wantsHtml = format === "html" || accept.includes("text/html");
-    const pageParam = Number.parseInt(url.searchParams.get("page") ?? "0", 10);
-    const page = Number.isFinite(pageParam) ? Math.max(0, pageParam) : 0;
-
-    if (wantsHtml) {
-      const baseParams = new URLSearchParams(url.searchParams);
-      baseParams.set("format", "html");
-      baseParams.delete("page");
-      const baseQuery = baseParams.toString();
-      const sourceParams = new URLSearchParams(baseParams);
-      sourceParams.delete("source");
-      const sourceQueryBase = sourceParams.toString();
-      const html = renderSlotsTable(displaySlots, {
-        generatedAt,
-        page,
-        pageSize: 8,
-        basePath: url.pathname,
-        baseQuery,
-        source,
-        availableSources: AVAILABLE_SOURCES,
-        sourceQueryBase,
-        warnings,
-      });
-      const cacheTTL = forceRefresh ? "no-cache" : "public, max-age=120";
-      return new Response(html, {
-        headers: {
-          "Content-Type": "text/html; charset=utf-8",
-          "Cache-Control": cacheTTL,
-        },
-      });
-    }
-
-    const body = JSON.stringify(
-      {
-        count: displaySlots.length,
-        startDate,
-        endDate,
-        source,
-        availableSources: AVAILABLE_SOURCES,
-        refreshed: forceRefresh,
-        lastUpdatedAt: generatedAt.toISOString(),
-        warnings,
-        slots: displaySlots,
-      },
-      null,
-      2
-    );
-    return new Response(body, {
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": forceRefresh ? "no-cache" : "public, max-age=120",
-      },
-    });
+    return createApp().fetch(request, env, ctx);
   },
 
   async scheduled(
     event: ScheduledEvent,
-    env: WorkerEnv,
+    env: Env,
     ctx: ExecutionContext
   ): Promise<void> {
     const startDate = getTodayUTC8();

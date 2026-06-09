@@ -3,6 +3,7 @@ import { getTodayUTC8, getDateDaysAhead } from "./utils/time";
 
 import { runTimeslotSync, AVAILABLE_SOURCES, USTHING_BEARER_KV_KEY } from "./sync/run";
 import { createApp } from "./http/app";
+import { DeliveryService } from "./notifications/delivery-service";
 
 const DEFAULT_DATA_SOURCE: DataSourceKey = "usthing";
 
@@ -137,6 +138,24 @@ export default {
     }
 
     return createApp().fetch(request, env, ctx);
+  },
+
+  async queue(batch: MessageBatch<{ outboxId: string }>, env: Env): Promise<void> {
+    const service = new DeliveryService(env.APP_DB);
+    for (const message of batch.messages) {
+      try {
+        const claimed = await service.claimOutbox(message.body.outboxId, new Date().toISOString());
+        if (claimed) {
+          // Decrypt channel, call PushDeer provider, markSent/markFailed
+          // Full integration in P3T5
+          message.ack();
+        } else {
+          message.ack();
+        }
+      } catch {
+        message.retry();
+      }
+    }
   },
 
   async scheduled(

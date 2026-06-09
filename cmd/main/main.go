@@ -10,13 +10,7 @@ import (
 	"log"
 	"os"
 	"strings"
-	"time"
 )
-
-func getCurrentTimeInUTC8() time.Time {
-	utc8 := time.FixedZone("UTC+8", 8*3600)
-	return time.Now().In(utc8)
-}
 
 func main() {
 	sourceFlag := flag.String("source", "", "Data sources to use: usthing,jiushi (comma-separated, default: configured sources)")
@@ -59,22 +53,13 @@ func main() {
 
 	// 常驻模式：WebSocket + 定时扫描
 	fmt.Println("Starting WebSocket server on :8080...")
-	go func() {
-		ticker := time.NewTicker(1 * time.Minute)
-		defer ticker.Stop()
-		for range ticker.C {
-			now := getCurrentTimeInUTC8()
-			hour := now.Hour()
-			if hour >= 8 && hour < 22 {
-				log.Println("Running scheduled scan...")
-				scanAll(enabledSources)
-			} else {
-				log.Println("Outside operating hours (08:00-22:00 HKT), skipping...")
-			}
-		}
-	}()
 
-	webui.StartWebSocketServer("8080")
+	// 构造扫描函数，注入启用的数据源
+	scanner := func() []service.UnifiedTimeSlot {
+		return scanAll(enabledSources)
+	}
+
+	webui.StartWebSocketServer("8080", scanner)
 }
 
 func resolveSources(flagVal string) []string {
@@ -123,16 +108,18 @@ func validateCredentials(sources []string) {
 
 func runOnce(sources []string) {
 	fmt.Println("Running one-time scan...")
-	scanAll(sources)
-	fmt.Println("Done.")
+	slots := scanAll(sources)
+	fmt.Printf("Done. Total available slots: %d\n", len(slots))
 }
 
-func scanAll(sources []string) {
+func scanAll(sources []string) []service.UnifiedTimeSlot {
 	pushKeys := os.Getenv("PUSHDEER_KEYS")
 	var pushService *pushdeer.PushDeerService
 	if pushKeys != "" {
 		pushService = pushdeer.NewPushDeerService(strings.Split(pushKeys, ","))
 	}
+
+	var all []service.UnifiedTimeSlot
 
 	for _, s := range sources {
 		switch s {
@@ -147,6 +134,7 @@ func scanAll(sources []string) {
 				continue
 			}
 			log.Printf("[USThing] Found %d available slots", len(slots))
+			all = append(all, slots...)
 			if pushService != nil && len(slots) > 0 {
 				if err := pushService.PushTimeSlots(slots); err != nil {
 					log.Printf("[PushDeer] Push failed: %v", err)
@@ -164,11 +152,14 @@ func scanAll(sources []string) {
 				continue
 			}
 			log.Printf("[Jiushi] Found %d slots", len(jiushiSlots))
+			all = append(all, jiushiSlots...)
 
 		default:
 			log.Printf("[%s] Unknown source, skipping", s)
 		}
 	}
+
+	return all
 }
 
 // 初始化 token manager

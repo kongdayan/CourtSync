@@ -11,6 +11,7 @@ node_modules/
 .wrangler/
 .wrangler-logs/
 .npm/
+.superpowers/
 
 # Local environment overrides
 .dev.vars

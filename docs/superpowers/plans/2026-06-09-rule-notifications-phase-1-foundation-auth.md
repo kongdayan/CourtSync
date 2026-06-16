@@ -107,7 +107,7 @@ Create `wrangler.jsonc` with the current Worker name, `DB`, `JIUSHI_DB`, `hkust_
     "logs": { "enabled": true, "invocation_logs": true }
   },
   "vars": {
-    "APP_BASE_URL": "https://sports.hunao.online",
+    "APP_BASE_URL": "https://sports.anserlabs.com",
     "DEFAULT_RULE_LIMIT": "2",
     "ADMIN_RULE_LIMIT": "20",
     "USTHING_USERNAME": "yanag@connect.ust.hk",

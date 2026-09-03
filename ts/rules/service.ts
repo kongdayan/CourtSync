@@ -1,4 +1,6 @@
 import type { D1Database } from "@cloudflare/workers-types";
+import type { DataSourceKey } from "../shared/sources";
+import { getFacilityIdsForSource } from "./catalog";
 import type { CompiledRule } from "./schema";
 import { RuleRepository } from "./repository";
 
@@ -40,6 +42,21 @@ export class RuleService {
     if (!existing || existing.user_id !== userId) {
       throw Object.assign(new Error("rule_not_found"), { code: "rule_not_found" });
     }
+
+    // PATCH can change source and/or facilityIds independently; validate the
+    // merged values so a rule can't end up with facilities from another source.
+    if (updates.source !== undefined || updates.facilityIds !== undefined) {
+      const mergedSource = (updates.source ?? existing.source) as DataSourceKey;
+      const mergedFacilityIds =
+        updates.facilityIds ?? (JSON.parse(existing.facility_ids_json) as string[]);
+      const validIds = getFacilityIdsForSource(mergedSource);
+      if (!mergedFacilityIds.every((fid) => validIds.has(fid))) {
+        throw Object.assign(new Error("facility_ids_source_mismatch"), {
+          code: "validation_error",
+        });
+      }
+    }
+
     const row = await this.repo.update(id, updates);
     if (!row) throw Object.assign(new Error("update_failed"), { code: "update_failed" });
     return {

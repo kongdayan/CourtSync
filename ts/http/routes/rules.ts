@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { RuleRepository } from "../../rules/repository";
 import { RuleService } from "../../rules/service";
-import { ruleInputSchema, compileRuleInput } from "../../rules/schema";
+import { ruleInputSchema, rulePatchSchema, compileRuleInput } from "../../rules/schema";
 import { weekdaysToMask, timeslotsToMask } from "../../rules/masks";
 import { SOURCE_DEFINITIONS, HOURLY_TIMESLOTS } from "../../shared/sources";
 import { FACILITY_CATALOG } from "../../rules/catalog";
@@ -46,7 +46,7 @@ export const rulesRoutes = new Hono<{ Bindings: Env; Variables: AuthVariables }>
   // PATCH /api/rules/:id
   .patch("/rules/:id", async (c) => {
     const body = await c.req.json();
-    const parsed = ruleInputSchema.partial().safeParse(body);
+    const parsed = rulePatchSchema.safeParse(body);
     if (!parsed.success) {
       return c.json({ error: "validation_error", details: parsed.error.flatten() }, 400);
     }
@@ -58,17 +58,21 @@ export const rulesRoutes = new Hono<{ Bindings: Env; Variables: AuthVariables }>
     if (data.timeslots !== undefined) partial.timeslotMask = timeslotsToMask(data.timeslots);
     if (data.facilityIds !== undefined) partial.facilityIds = data.facilityIds;
     if (data.minConsecutive !== undefined) partial.minConsecutive = data.minConsecutive;
-    if (data.pushLimit !== undefined) {
-      partial.pushLimit = data.pushLimit;
-      partial.enabled = data.pushLimit !== 0;
-    }
+    if (data.pushLimit !== undefined) partial.pushLimit = data.pushLimit;
     if (data.enabled !== undefined) partial.enabled = data.enabled;
+    // Mirror compileRuleInput: pushLimit 0 always disables, even if the
+    // client also sent enabled: true. A non-zero pushLimit alone must NOT
+    // silently re-enable a disabled rule.
+    if (data.pushLimit === 0) partial.enabled = false;
     const service = new RuleService(new RuleRepository(c.env.APP_DB), c.env.APP_DB);
     try {
       const rule = await service.update(c.get("access").userId, c.req.param("id"), partial as any);
       return c.json(rule);
     } catch (err: any) {
       if (err.code === "rule_not_found") return c.json({ error: "rule_not_found" }, 404);
+      if (err.code === "validation_error") {
+        return c.json({ error: "validation_error", details: err.message }, 400);
+      }
       throw err;
     }
   })

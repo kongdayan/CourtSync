@@ -11,7 +11,8 @@
     "run_worker_first": ["/api/*"]
   },
   "triggers": {
-    "crons": ["*/5 0-14 * * *"]
+    // Paused 2026-09-03: upstream sources failing (USThing invalid_grant, Jiushi WAF 403).
+    // Re-enable with: "crons": ["*/5 0-14 * * *"]
   },
   "kv_namespaces": [
     {
@@ -62,7 +63,7 @@
     }
   },
   "vars": {
-    "APP_BASE_URL": "https://sports.hunao.online",
+    "APP_BASE_URL": "https://sports.anserlabs.com",
     "DEFAULT_RULE_LIMIT": 2,
     "ADMIN_RULE_LIMIT": 20,
     "USTHING_USERNAME": "yanag@connect.ust.hk",

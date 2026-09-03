@@ -12,7 +12,7 @@ CourtSync is a multi-source badminton court availability tracker — Cloudflare 
 - `ts/views/` HTML dashboard rendering.
 - `ts/constants/` Facility ID → display name mappings.
 - `d1/schema.sql` D1 schema for `slot_snapshot`.
-- `wrangler.toml` Worker config, cron triggers, and bindings.
+- `wrangler.jsonc` Worker config, cron triggers, and bindings (sole wrangler config; `wrangler.toml` was removed).
 - `internal/usthing/usthing.go` Go USThing client — TokenManager with auto-refresh + 401 retry.
 - `internal/jiushi/jiushi.go` Go Jiushi client — auto acw_tc acquisition.
 - `internal/service/` Go slot aggregation.
@@ -21,7 +21,7 @@ CourtSync is a multi-source badminton court availability tracker — Cloudflare 
 ## Common Commands
 - Install deps: `npm install`
 - Local dev: `npx wrangler dev --test-scheduled`
-- Deploy: `npx wrangler deploy`
+- Deploy: `npm run deploy` — guarded by `scripts/deploy-guard.mjs`, which refuses to run from a linked worktree. **Production = the last `wrangler deploy`; only ever deploy from the main working tree (never from `.worktrees/*`).**
 - Go CLI: `go run ./cmd/main/`
 
 ## Authentication
@@ -43,6 +43,7 @@ Alibaba Cloud ESA WAF issues `acw_tc` cookie on first request. `acquireAcwTc()` 
 | Jiushi | `/jiushi-core/venue/getVenueGround` | POST | `QueryVenueData` / `queryVenueData` |
 
 ## Change Notes
+- Production is whatever was last deployed — deploying from a worktree silently ships it. The deploy guard blocks this; keep the main working tree current and deploy only from there.
 - When adding facility IDs, update both Go and TS constants + service logic.
 - Table layouts: keep compact/detailed modes and tooltips synchronized.
 - Token/auth warnings must propagate from fetchers to UI.

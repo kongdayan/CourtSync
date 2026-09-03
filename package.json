@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "deploy": "npm run build && wrangler deploy",
+    "deploy": "node scripts/deploy-guard.mjs && npm run build && wrangler deploy",
     "preview": "vite preview",
     "cf-typegen": "wrangler types --env-interface Env",
     "typecheck": "tsc -p tsconfig.json --noEmit",

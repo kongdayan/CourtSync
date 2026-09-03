@@ -17,7 +17,7 @@ Multi-source badminton court availability tracker with Cloudflare Worker + Go CL
 | `ts/notifications/` | PushDeer integration. |
 | `ts/views/` | HTML dashboard (`table.ts`). |
 | `templates/` | Legacy HTML templates. |
-| `wrangler.toml` | Worker config. |
+| `wrangler.jsonc` | Worker config (sole wrangler config; `wrangler.toml` removed). |
 
 ## API Architecture
 
@@ -67,6 +67,8 @@ CREATE TABLE IF NOT EXISTS slot_snapshot (
 ```
 
 ## AI Agent Notes
+
+- Deploy only from the main working tree — `npm run deploy` runs `scripts/deploy-guard.mjs`, which refuses linked worktrees.
 
 - Reuse existing functions from `ts/sources/`, `ts/service/`, `ts/views/`, `ts/constants/`.
 - Go `TokenManager` is the single auth source — all API calls go through `doWithAuthRetry()`.

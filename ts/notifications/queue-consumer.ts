@@ -44,11 +44,32 @@ export async function handleQueueBatch(
         await deliver(claimed, db, channels, env);
         const fingerprints = JSON.parse(claimed.match_fingerprints_json) as string[];
         await service.markSent(claimed.id, fingerprints, now);
+        await channels.clearDeliveryFailure(claimed.channel_id);
         message.ack();
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err);
         console.error(`outbox ${claimed.id} delivery failed:`, reason);
         await service.markFailed(claimed.id, reason);
+        // Surface provider/decrypt failures on the channel itself (last_error
+        // + recent failure count) so the settings UI can warn the user.
+        // Precondition failures (user disabled, channel deleted/disabled) are
+        // not the channel's fault and must not pollute its last_error.
+        if (!(err instanceof PreconditionError)) {
+          try {
+            const tracked = await channels.markDeliveryFailure(
+              claimed.channel_id,
+              reason,
+              now,
+            );
+            if (tracked.recentFailures >= RECENT_FAILURE_WARN) {
+              console.error(
+                `channel ${claimed.channel_id} failed ${tracked.recentFailures} deliveries in the last 24h: ${tracked.lastError}`,
+              );
+            }
+          } catch (trackErr) {
+            console.error("channel failure tracking failed:", trackErr);
+          }
+        }
         // Terminal: the orchestrator only re-enqueues 'pending' rows.
         message.ack();
       }
@@ -58,6 +79,11 @@ export async function handleQueueBatch(
     }
   }
 }
+
+/** Failure before/at the provider boundary caused by state, not the channel. */
+class PreconditionError extends Error {}
+
+const RECENT_FAILURE_WARN = 10;
 
 async function deliver(
   claimed: OutboxRow,
@@ -71,20 +97,20 @@ async function deliver(
     .bind(claimed.user_id)
     .first<{ status: string }>();
   if (!access || access.status !== "active") {
-    throw new Error("user access not active");
+    throw new PreconditionError("user access not active");
   }
 
   const channel = await channels.getById(claimed.channel_id);
-  if (!channel) throw new Error("channel not found");
-  if (!channel.enabled) throw new Error("channel disabled");
-  if (!channel.verified_at) throw new Error("channel not verified");
+  if (!channel) throw new PreconditionError("channel not found");
+  if (!channel.enabled) throw new PreconditionError("channel disabled");
+  if (!channel.verified_at) throw new PreconditionError("channel not verified");
 
   const keyRing = parseKeyRing(env.CHANNEL_ENCRYPTION_KEYS);
   const config = await decryptChannelConfig(keyRing, channel.encrypted_config);
-  if (!config.pushKey) throw new Error("channel missing pushKey");
+  if (!config.pushKey) throw new PreconditionError("channel missing pushKey");
 
   const payload = JSON.parse(claimed.payload_json) as NotificationPayload;
-  if (!payload.matches?.length) throw new Error("empty payload");
+  if (!payload.matches?.length) throw new PreconditionError("empty payload");
 
   await pushDeer.send(config, payload);
 }

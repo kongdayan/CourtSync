@@ -181,4 +181,55 @@ describe("handleQueueBatch", () => {
     expect(fetchMock).not.toHaveBeenCalled();
     expect(msg.acked).toBe(true);
   });
+
+  it("records provider failures on the channel, cleared by a later success", async () => {
+    await seedOutbox();
+    const failing = vi.fn(async () => ({ ok: false, status: 500 }));
+    vi.stubGlobal("fetch", failing);
+    await handleQueueBatch(
+      { messages: [makeMessage("ob1")] },
+      { APP_DB: env.APP_DB, CHANNEL_ENCRYPTION_KEYS: KEY_RING_JSON } as unknown as Env
+    );
+
+    let ch = await env.APP_DB
+      .prepare("SELECT last_error FROM notification_channel WHERE id = 'ch1'")
+      .first<{ last_error: string | null }>();
+    expect(ch!.last_error).toContain("500");
+
+    // Success on the next attempt clears the marker.
+    await env.APP_DB
+      .prepare("UPDATE notification_outbox SET status = 'pending' WHERE id = 'ob1'")
+      .run();
+    const ok = vi.fn(async () => ({ ok: true, json: async () => ({ code: 0 }) }));
+    vi.stubGlobal("fetch", ok);
+    await handleQueueBatch(
+      { messages: [makeMessage("ob1")] },
+      { APP_DB: env.APP_DB, CHANNEL_ENCRYPTION_KEYS: KEY_RING_JSON } as unknown as Env
+    );
+
+    ch = await env.APP_DB
+      .prepare("SELECT last_error FROM notification_channel WHERE id = 'ch1'")
+      .first<{ last_error: string | null }>();
+    expect(ch!.last_error).toBeNull();
+  });
+
+  it("does not mark the channel for precondition failures (disabled user)", async () => {
+    await seedOutbox();
+    await env.APP_DB
+      .prepare("UPDATE notification_channel SET last_error = 'old' WHERE id = 'ch1'")
+      .run();
+    await env.APP_DB.prepare("UPDATE user_access SET status = 'disabled' WHERE user_id = 'u1'").run();
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    await handleQueueBatch(
+      { messages: [makeMessage("ob1")] },
+      { APP_DB: env.APP_DB, CHANNEL_ENCRYPTION_KEYS: KEY_RING_JSON } as unknown as Env
+    );
+
+    const ch = await env.APP_DB
+      .prepare("SELECT last_error FROM notification_channel WHERE id = 'ch1'")
+      .first<{ last_error: string | null }>();
+    expect(ch!.last_error).toBe("old"); // untouched
+  });
 });

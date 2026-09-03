@@ -68,6 +68,41 @@ export class ChannelRepository {
     ).bind(userId, provider).first<ChannelRow>())!;
   }
 
+  /** Clears a previously recorded delivery failure after a successful send. */
+  async clearDeliveryFailure(channelId: string): Promise<void> {
+    await this.db
+      .prepare("UPDATE notification_channel SET last_error = NULL WHERE id = ? AND last_error IS NOT NULL")
+      .bind(channelId)
+      .run();
+  }
+
+  /**
+   * Records a delivery failure on a channel so the UI can surface it.
+   * Never disables the channel automatically — auto-disabling on transient
+   * provider errors would silently kill the user's notifications.
+   * Returns recent failure count (best-effort consecutive proxy) within the
+   * lookback window so callers/tests can alert on repeated failures.
+   */
+  async markDeliveryFailure(
+    channelId: string,
+    error: string,
+    now: string,
+    recentWindowMs = 24 * 3600_000,
+  ): Promise<{ lastError: string; recentFailures: number }> {
+    const lastError = error.slice(0, 200);
+    const since = new Date(new Date(now).getTime() - recentWindowMs).toISOString();
+    await this.db.prepare(
+      "UPDATE notification_channel SET last_error = ?, updated_at = ? WHERE id = ?"
+    ).bind(lastError, now, channelId).run();
+    const row = await this.db
+      .prepare(
+        "SELECT COUNT(*) AS n FROM notification_outbox WHERE channel_id = ? AND status = 'failed' AND created_at >= ?"
+      )
+      .bind(channelId, since)
+      .first<{ n: number }>();
+    return { lastError, recentFailures: row?.n ?? 0 };
+  }
+
   async delete(userId: string, provider: string): Promise<boolean> {
     const result = await this.db.prepare(
       "DELETE FROM notification_channel WHERE user_id = ? AND provider = ?"

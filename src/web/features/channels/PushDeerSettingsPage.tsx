@@ -149,6 +149,16 @@ export function PushDeerSettingsPage() {
       />
 
       <div className="space-y-4 rounded-lg border border-gray-200 p-6">
+        {/* Last delivery failure, if any (cleared on successful send) */}
+        {isSaved && existingChannel?.lastError && (
+          <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            最近一次推送失败：{existingChannel.lastError}
+            <p className="mt-1 text-xs text-amber-700">
+              若持续失败，请检查 PushDeer Key 是否仍然有效（可重新测试并保存）。
+            </p>
+          </div>
+        )}
+
         {/* Description */}
         <p className="text-sm text-gray-600">
           配置 PushDeer 推送，在有可用场地时接收通知。

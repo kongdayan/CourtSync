@@ -1,6 +1,6 @@
 import { runScheduledSync } from "./sync/orchestrator";
 import { createApp } from "./http/app";
-import { DeliveryService } from "./notifications/delivery-service";
+import { handleQueueBatch } from "./notifications/queue-consumer";
 
 export default {
   async fetch(
@@ -14,19 +14,7 @@ export default {
   },
 
   async queue(batch: MessageBatch<{ outboxId: string }>, env: Env): Promise<void> {
-    const service = new DeliveryService(env.APP_DB);
-    for (const message of batch.messages) {
-      try {
-        const claimed = await service.claimOutbox(message.body.outboxId, new Date().toISOString());
-        if (claimed) {
-          message.ack();
-        } else {
-          message.ack();
-        }
-      } catch {
-        message.retry();
-      }
-    }
+    await handleQueueBatch(batch, env);
   },
 
   async scheduled(

@@ -17,6 +17,13 @@ export interface ChannelRow {
 export class ChannelRepository {
   constructor(private db: D1Database) {}
 
+  async getById(id: string): Promise<ChannelRow | null> {
+    return this.db
+      .prepare("SELECT * FROM notification_channel WHERE id = ?")
+      .bind(id)
+      .first<ChannelRow>() ?? null;
+  }
+
   async getByUserAndProvider(userId: string, provider: string): Promise<ChannelRow | null> {
     return this.db.prepare(
       "SELECT * FROM notification_channel WHERE user_id = ? AND provider = ?"

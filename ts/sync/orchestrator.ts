@@ -6,6 +6,7 @@ import { MatchRepository } from "../matching/repository";
 import { reconcileMatches } from "../matching/reconcile";
 import { isMatchEligible } from "../notifications/eligibility";
 import { OutboxRepository } from "../notifications/outbox-repository";
+import { runRetentionCleanup } from "./retention";
 import { SourceHealthRepository } from "./source-health-repository";
 import type { SourceSyncResult } from "./types";
 import type { CompiledRule, RuleMatch } from "../matching/types";
@@ -154,5 +155,15 @@ export async function runScheduledSync(
         // will retry next run
       }
     }
+  }
+
+  // Step 5: 30-day retention cleanup (daily-throttled, non-fatal)
+  try {
+    const retention = await runRetentionCleanup(env.APP_DB, now);
+    if (retention.ran) {
+      console.log("retention cleanup", JSON.stringify(retention.deleted));
+    }
+  } catch (err) {
+    console.error("retention cleanup failed", err);
   }
 }

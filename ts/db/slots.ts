@@ -1,7 +1,7 @@
 import { UnifiedTimeSlot } from "../types";
 
 const UPSERT_SQL = `
-  INSERT OR REPLACE INTO slot_snapshot (
+  INSERT INTO slot_snapshot (
     facility_id,
     slot_date,
     start_time,
@@ -10,6 +10,14 @@ const UPSERT_SQL = `
     activity_name,
     updated_at
   ) VALUES (?, ?, ?, ?, ?, ?, ?)
+  ON CONFLICT(facility_id, slot_date, start_time) DO UPDATE SET
+    end_time = excluded.end_time,
+    status = excluded.status,
+    activity_name = excluded.activity_name,
+    updated_at = excluded.updated_at
+  WHERE slot_snapshot.end_time IS NOT excluded.end_time
+     OR slot_snapshot.status IS NOT excluded.status
+     OR slot_snapshot.activity_name IS NOT excluded.activity_name
 `;
 
 const TRIM_SQL = `
@@ -26,15 +34,20 @@ const SELECT_RANGE_SQL = `
 
 const BATCH_SIZE = 40;
 
+export interface PersistResult {
+  attempted: number;
+  changed: number;
+}
+
 export async function persistSlots(
   db: D1Database | undefined,
   slots: UnifiedTimeSlot[],
   startDate: string,
   endDate: string,
   generatedAt: Date
-): Promise<void> {
+): Promise<PersistResult> {
   if (!db) {
-    return;
+    return { attempted: 0, changed: 0 };
   }
 
   const trimmedSlots = slots.map((slot) => ({
@@ -49,7 +62,7 @@ export async function persistSlots(
   }
 
   if (!trimmedSlots.length) {
-    return;
+    return { attempted: 0, changed: 0 };
   }
 
   const updatedAt = generatedAt.toISOString();
@@ -67,10 +80,16 @@ export async function persistSlots(
       )
   );
 
+  let changed = 0;
   for (let i = 0; i < statements.length; i += BATCH_SIZE) {
     const chunk = statements.slice(i, i + BATCH_SIZE);
-    await db.batch(chunk);
+    const results = await db.batch(chunk);
+    for (const r of results) {
+      changed += r.meta.changes;
+    }
   }
+
+  return { attempted: trimmedSlots.length, changed };
 }
 
 export interface LoadedSlots {

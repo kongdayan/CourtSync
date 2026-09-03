@@ -3,6 +3,7 @@ import { useState, useCallback } from "react";
 import { apiFetch } from "../../lib/api";
 import { useMe } from "../../lib/use-me";
 import { UserAccessDialog } from "./UserAccessDialog";
+import { PageHeader } from "../shared/PageHeader";
 
 interface AdminUserSummary {
   id: string;
@@ -63,7 +64,7 @@ export function AdminUsersPage() {
   if (me && me.access.role !== "admin") {
     return (
       <div className="mx-auto max-w-4xl p-4">
-        <h1 className="mb-4 text-xl font-bold">用户管理</h1>
+        <PageHeader title="用户管理" />
         <p className="text-muted-foreground">无权访问</p>
       </div>
     );
@@ -75,7 +76,10 @@ export function AdminUsersPage() {
 
   return (
     <div className="mx-auto max-w-5xl p-4">
-      <h1 className="mb-6 text-xl font-bold">用户管理</h1>
+      <PageHeader
+        title="用户管理"
+        description="审批用户、调整角色和规则配额。"
+      />
 
       {/* Filters */}
       <div className="mb-4 flex flex-wrap items-center gap-3">

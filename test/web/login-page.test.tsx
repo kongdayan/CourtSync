@@ -22,6 +22,6 @@ describe("LoginPage", () => {
     render(<LoginPage />);
     await userEvent.click(screen.getByRole("button", { name: "使用 Google 账号登录" }));
 
-    expect(signInWithGooglePopup).toHaveBeenCalledWith("/account");
+    expect(signInWithGooglePopup).toHaveBeenCalledWith("/");
   });
 });

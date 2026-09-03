@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMe } from "../../lib/use-me";
+import { authClient } from "../../lib/auth-client";
 import { Link } from "react-router-dom";
 import { useState, useMemo } from "react";
 import { resolveFacilityName, listKnownFacilities } from "../../../../ts/constants/facilities";
@@ -142,6 +143,11 @@ export function DashboardPage() {
     URL.revokeObjectURL(a.href);
   };
 
+  const handleSignOut = async () => {
+    await authClient.signOut();
+    window.location.assign("/");
+  };
+
   // ---- shared helper: action button ----------
   const Btn = (p: { active?: boolean; onClick: () => void; children: React.ReactNode }) => (
     <button
@@ -174,12 +180,26 @@ export function DashboardPage() {
           <nav className="flex items-center gap-3">
             {me ? (
               <>
-                <Link to="/account" className="text-sm font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors">
-                  账户
-                </Link>
+                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                  {me.user.name || me.user.email}
+                </span>
                 <Link to="/rules" className="text-sm font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors">
                   通知规则
                 </Link>
+                <Link to="/settings/notifications" className="text-sm font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors">
+                  推送设置
+                </Link>
+                {me.access.role === "admin" && (
+                  <Link to="/admin/users" className="text-sm font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors">
+                    用户管理
+                  </Link>
+                )}
+                <button
+                  onClick={() => void handleSignOut()}
+                  className="text-sm font-medium text-slate-500 transition-colors hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                >
+                  退出
+                </button>
               </>
             ) : (
               <Link to="/login" className="text-sm font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors">

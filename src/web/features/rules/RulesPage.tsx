@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { apiFetch } from "../../lib/api";
 import { useMe } from "../../lib/use-me";
+import { PageHeader } from "../shared/PageHeader";
 
 interface Rule {
   id: string;
@@ -39,28 +40,33 @@ export function RulesPage() {
 
   return (
     <div className="mx-auto max-w-4xl p-4">
-      {/* Header */}
-      <header className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold">通知规则</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            已使用 {ruleCount} / {ruleLimit}
-          </p>
-        </div>
-        <Link
-          to={atQuota ? "#" : "/rules/new"}
-          className={`rounded-lg px-4 py-2 text-sm font-medium ${
-            atQuota
-              ? "cursor-not-allowed bg-gray-200 text-gray-400"
-              : "bg-blue-600 text-white hover:bg-blue-700"
-          }`}
-          onClick={(e) => {
-            if (atQuota) e.preventDefault();
-          }}
-        >
-          新建规则
-        </Link>
-      </header>
+      <PageHeader
+        title="通知规则"
+        description={`已使用 ${ruleCount} / ${ruleLimit}`}
+        actions={
+          <>
+            <Link
+              to="/settings/notifications"
+              className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200"
+            >
+              推送设置
+            </Link>
+            <Link
+              to={atQuota ? "#" : "/rules/new"}
+              className={`rounded-lg px-4 py-2 text-sm font-medium ${
+                atQuota
+                  ? "cursor-not-allowed bg-gray-200 text-gray-400"
+                  : "bg-blue-600 text-white hover:bg-blue-700"
+              }`}
+              onClick={(e) => {
+                if (atQuota) e.preventDefault();
+              }}
+            >
+              新建规则
+            </Link>
+          </>
+        }
+      />
 
       {/* Quota warning */}
       {atQuota && (

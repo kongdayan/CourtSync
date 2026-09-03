@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useState } from "react";
 import { apiFetch, apiPost, apiPatch, ApiError } from "../../lib/api";
 import { RuleForm, type RuleFormData } from "./RuleForm";
 import { HOURLY_TIMESLOTS } from "@shared/sources";
+import { PageHeader } from "../shared/PageHeader";
 
 interface RuleResponse {
   id: string;
@@ -118,6 +119,11 @@ export function RuleEditorPage() {
   if (isEditing && ruleLoading) {
     return (
       <div className="mx-auto max-w-4xl p-4">
+        <PageHeader
+          title="编辑规则"
+          backTo="/rules"
+          backLabel="返回规则列表"
+        />
         <p className="text-muted-foreground">加载中...</p>
       </div>
     );
@@ -127,6 +133,11 @@ export function RuleEditorPage() {
   if (isEditing && ruleError) {
     return (
       <div className="mx-auto max-w-4xl p-4">
+        <PageHeader
+          title="编辑规则"
+          backTo="/rules"
+          backLabel="返回规则列表"
+        />
         <p className="text-red-500">规则加载失败</p>
         <button
           onClick={() => navigate("/rules")}
@@ -140,12 +151,19 @@ export function RuleEditorPage() {
 
   return (
     <div className="mx-auto max-w-4xl p-4">
-      {/* Header */}
-      <header className="mb-6">
-        <h1 className="text-xl font-bold">
-          {isEditing ? "编辑规则" : "新建规则"}
-        </h1>
-      </header>
+      <PageHeader
+        title={isEditing ? "编辑规则" : "新建规则"}
+        backTo="/rules"
+        backLabel="返回规则列表"
+        actions={
+          <Link
+            to="/settings/notifications"
+            className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200"
+          >
+            推送设置
+          </Link>
+        }
+      />
 
       {/* Submit error */}
       {submitError && (

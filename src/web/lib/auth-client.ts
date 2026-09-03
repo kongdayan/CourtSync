@@ -9,6 +9,15 @@ const popupAuthClient = createAuthClient({
   disableDefaultFetchPlugins: true,
 });
 
+async function hasCurrentSession(): Promise<boolean> {
+  try {
+    const response = await fetch("/api/me", { credentials: "include" });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
 export function signInWithGooglePopup(
   callbackUrl = "/account",
 ): Promise<void> {
@@ -32,7 +41,7 @@ export function signInWithGooglePopup(
     popup.focus?.();
 
     let settled = false;
-    const finish = (error?: Error) => {
+    const finish = (error?: Error, shouldNavigate = false) => {
       if (settled) {
         return;
       }
@@ -46,6 +55,9 @@ export function signInWithGooglePopup(
       if (error) {
         reject(error);
       } else {
+        if (shouldNavigate) {
+          window.location.assign(callbackUrl);
+        }
         resolve();
       }
     };
@@ -55,15 +67,22 @@ export function signInWithGooglePopup(
         return;
       }
       if (event.data?.type === "courtsync:oauth-complete") {
-        finish();
+        finish(undefined, true);
       }
     };
 
     window.addEventListener("message", onMessage);
 
     const timer = setInterval(() => {
-      if (popup.closed) {
-        finish();
+      try {
+        if (popup.closed) {
+          void hasCurrentSession().then((hasSession) => {
+            finish(undefined, hasSession);
+          });
+        }
+      } catch {
+        // Google sets Cross-Origin-Opener-Policy headers while the popup is
+        // cross-origin, which can make window.closed inaccessible.
       }
     }, 500);
 

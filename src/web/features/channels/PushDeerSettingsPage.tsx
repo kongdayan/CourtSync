@@ -1,6 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { apiFetch, apiPost, apiPut, ApiError } from "../../lib/api";
 import { useState, useCallback, useEffect } from "react";
+import { PageHeader } from "../shared/PageHeader";
 
 interface ChannelInfo {
   provider: string;
@@ -123,7 +125,7 @@ export function PushDeerSettingsPage() {
   if (state.status === "loading") {
     return (
       <div className="mx-auto max-w-lg p-6">
-        <h1 className="mb-6 text-xl font-bold">推送设置</h1>
+        <PageHeader title="推送设置" />
         <p className="text-muted-foreground">加载中...</p>
       </div>
     );
@@ -133,7 +135,18 @@ export function PushDeerSettingsPage() {
 
   return (
     <div className="mx-auto max-w-lg p-6">
-      <h1 className="mb-6 text-xl font-bold">推送设置</h1>
+      <PageHeader
+        title="推送设置"
+        description="配置 PushDeer 后，规则命中时会把可用场地推送给您。"
+        actions={
+          <Link
+            to="/rules"
+            className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200"
+          >
+            通知规则
+          </Link>
+        }
+      />
 
       <div className="space-y-4 rounded-lg border border-gray-200 p-6">
         {/* Description */}

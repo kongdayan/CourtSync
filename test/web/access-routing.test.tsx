@@ -25,13 +25,13 @@ const slotsResponse = {
 };
 
 describe("DashboardPage", () => {
-  it("shows source tabs with business names", async () => {
+  it("shows signed-in navigation on the home page", async () => {
     const { apiFetch } = await import("../../src/web/lib/api");
     // useMe calls /me first, then the dashboard calls /slots
     vi.mocked(apiFetch)
       .mockResolvedValueOnce({
-        user: { id: "1", email: "test@example.com", name: "Test" },
-        access: { role: "user", status: "active", ruleLimit: 2 },
+        user: { id: "1", email: "test@example.com", name: "Test User" },
+        access: { role: "admin", status: "active", ruleLimit: 2 },
       })
       .mockResolvedValueOnce(slotsResponse);
 
@@ -50,8 +50,19 @@ describe("DashboardPage", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("香港科技大学")).toBeInTheDocument();
-      expect(screen.getByText("上海万体汇羽毛球馆")).toBeInTheDocument();
+      expect(screen.getByText("Test User")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "通知规则" })).toHaveAttribute("href", "/rules");
+      expect(screen.getByRole("link", { name: "推送设置" })).toHaveAttribute(
+        "href",
+        "/settings/notifications",
+      );
+      expect(screen.getByRole("link", { name: "用户管理" })).toHaveAttribute(
+        "href",
+        "/admin/users",
+      );
+      expect(screen.getByRole("button", { name: "退出" })).toBeInTheDocument();
     });
+
+    expect(screen.queryByRole("link", { name: "账户" })).not.toBeInTheDocument();
   });
 });

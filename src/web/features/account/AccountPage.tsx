@@ -1,6 +1,7 @@
 import { useMe } from "../../lib/use-me";
 import { authClient } from "../../lib/auth-client";
 import { Navigate, useNavigate } from "react-router-dom";
+import { PageHeader } from "../shared/PageHeader";
 
 export function AccountPage() {
   const navigate = useNavigate();
@@ -25,8 +26,8 @@ export function AccountPage() {
 
   return (
     <div className="mx-auto max-w-lg p-6">
-      <h1 className="text-xl font-bold">账户</h1>
-      <div className="mt-4 space-y-2 rounded-lg border p-4">
+      <PageHeader title="账户" />
+      <div className="space-y-2 rounded-lg border p-4">
         <p><span className="font-medium">邮箱：</span>{data.user.email}</p>
         <p><span className="font-medium">姓名：</span>{data.user.name ?? "未设置"}</p>
         <p><span className="font-medium">角色：</span>{data.access.role === "admin" ? "管理员" : "普通用户"}</p>

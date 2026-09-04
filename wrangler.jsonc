@@ -11,8 +11,9 @@
     "run_worker_first": ["/api/*"]
   },
   "triggers": {
-    // Paused 2026-09-03: upstream sources failing (USThing invalid_grant, Jiushi WAF 403).
-    // Re-enable with: "crons": ["*/5 0-14 * * *"]
+    // Hourly sync during HKUST/venue hours (UTC 0-14 = CST 08:00-22:00).
+    // Re-enabled 2026-09-04 after USThing password refresh + Jiushi proxy restore.
+    "crons": ["0 0-14 * * *"]
   },
   "kv_namespaces": [
     {

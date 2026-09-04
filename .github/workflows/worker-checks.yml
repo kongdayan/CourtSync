@@ -21,7 +21,12 @@ jobs:
       - run: npm run typecheck
       - run: npm run test
       - run: npm run test:e2e
+      # Shared CI runners are ~3x slower than a dev machine (local p95 ~65 ms;
+      # measured ~196 ms on ubuntu-latest). Keep a hard gate for real
+      # algorithmic regressions but allow for runner variance.
       - run: npm run benchmark:matching
+        env:
+          BENCH_P95_MS_THRESHOLD: '300'
       - run: npm run build
       - run: go test ./...
       - run: go vet ./...

@@ -6,6 +6,10 @@ test.describe("channels", () => {
     await mockApi(page, "/me", mockMeResponse());
     await mockApi(page, "/channels", []);
     await page.goto("/settings/notifications");
-    await expect(page.getByText(/PushDeer/)).toBeVisible();
+    // Empty state: page header + key-input form are visible.
+    await expect(
+      page.getByRole("heading", { name: "推送设置" }),
+    ).toBeVisible();
+    await expect(page.getByPlaceholder("输入 PushDeer Key")).toBeVisible();
   });
 });

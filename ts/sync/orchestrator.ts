@@ -6,9 +6,6 @@ import { MatchRepository } from "../matching/repository";
 import { reconcileMatches } from "../matching/reconcile";
 import { isMatchEligible } from "../notifications/eligibility";
 import { OutboxRepository } from "../notifications/outbox-repository";
-import { runRetentionCleanup } from "./retention";
-import { SourceHealthRepository } from "./source-health-repository";
-import type { SourceSyncResult } from "./types";
 import type { CompiledRule, RuleMatch } from "../matching/types";
 import type { DataSourceKey } from "../shared/sources";
 import type { TimeslotSyncResult } from "./run";
@@ -22,42 +19,25 @@ export async function runScheduledSync(
 ): Promise<void> {
   const syncRunId = crypto.randomUUID();
   const sources: DataSourceKey[] = ["usthing", "jiushi"];
-  const allResults: SourceSyncResult[] = [];
-  const healthRepo = new SourceHealthRepository(env.APP_DB);
+  const allResults: TimeslotSyncResult[] = [];
 
-  // Step 1: Run source syncs independently
+  // Step 1: Run source syncs independently (no health tracking rows — the
+  // results table was pure log volume with no consumer; failures surface via
+  // warnings + empty data instead).
   for (const source of sources) {
-    const startedAt = new Date().toISOString();
-    let result: SourceSyncResult;
-
     try {
-      const syncResult = await runTimeslotSync(source, env);
-      result = {
-        ...syncResult,
-        completedUnits: syncResult.slots.length > 0 ? 8 : 0,
-        failedUnits: 0,
-      };
+      allResults.push(await runTimeslotSync(source, env));
     } catch (err) {
-      result = {
+      allResults.push({
         source,
         status: "failed",
         slots: [],
         warnings: [err instanceof Error ? err.message : String(err)],
-        completedUnits: 0,
-        failedUnits: 8,
-        fatalCode: "sync_error",
         startDate: new Date().toISOString().slice(0, 10),
         endDate: new Date().toISOString().slice(0, 10),
         generatedAt: new Date(),
-      };
+      });
     }
-
-    const finishedAt = new Date().toISOString();
-    const durationMs = new Date(finishedAt).getTime() - new Date(startedAt).getTime();
-
-    await healthRepo.recordRun(syncRunId, source, result.status, result.slots.length, result.warnings, durationMs, startedAt, finishedAt);
-    await healthRepo.updateHealth(source, result.status, finishedAt);
-    allResults.push(result);
   }
 
   // Step 2: For each successful source, match rules
@@ -155,15 +135,5 @@ export async function runScheduledSync(
         // will retry next run
       }
     }
-  }
-
-  // Step 5: 30-day retention cleanup (daily-throttled, non-fatal)
-  try {
-    const retention = await runRetentionCleanup(env.APP_DB, now);
-    if (retention.ran) {
-      console.log("retention cleanup", JSON.stringify(retention.deleted));
-    }
-  } catch (err) {
-    console.error("retention cleanup failed", err);
   }
 }

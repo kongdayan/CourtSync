@@ -74,8 +74,6 @@ describe("scheduled orchestrator", () => {
   beforeEach(async () => {
     await env.APP_DB.prepare("DELETE FROM notification_outbox").run();
     await env.APP_DB.prepare("DELETE FROM rule_match_state").run();
-    await env.APP_DB.prepare("DELETE FROM source_sync_run").run();
-    await env.APP_DB.prepare("DELETE FROM source_health").run();
     await env.APP_DB.prepare("DELETE FROM notification_channel").run();
     await env.APP_DB.prepare("DELETE FROM notification_rule").run();
     await env.APP_DB.prepare("DELETE FROM user_access").run();
@@ -88,12 +86,6 @@ describe("scheduled orchestrator", () => {
     await expect(
       runScheduledSync(env as any, new Date(MOCK_NOW), mockSyncFn),
     ).resolves.toBeUndefined();
-  });
-
-  it("records source health after sync", async () => {
-    await runScheduledSync(env as any, new Date(MOCK_NOW), mockSyncFn);
-    const health = await env.APP_DB.prepare("SELECT * FROM source_health").all();
-    expect(health.results.length).toBeGreaterThan(0);
   });
 
   it("creates outbox entries for matched rules", async () => {

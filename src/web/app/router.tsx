@@ -1,27 +1,20 @@
 import { createBrowserRouter } from "react-router-dom";
 import { DashboardPage } from "../features/dashboard/DashboardPage";
-import { LoginPage } from "../features/auth/LoginPage";
-import { PopupCompletePage } from "../features/auth/PopupCompletePage";
-import { AccountPage } from "../features/account/AccountPage";
-import { RulesPage } from "../features/rules/RulesPage";
-import { RuleEditorPage } from "../features/rules/RuleEditorPage";
-import { PushDeerSettingsPage } from "../features/channels/PushDeerSettingsPage";
-import { AdminUsersPage } from "../features/admin/AdminUsersPage";
 import { RequireAccess } from "../features/auth/RequireAccess";
 
 export const router = createBrowserRouter([
   { path: "/", element: <DashboardPage /> },
-  { path: "/login", element: <LoginPage /> },
-  { path: "/auth/popup-complete", element: <PopupCompletePage /> },
-  { path: "/account", element: <AccountPage /> },
+  { path: "/login", lazy: async () => ({ Component: (await import("../features/auth/LoginPage")).LoginPage }) },
+  { path: "/auth/popup-complete", lazy: async () => ({ Component: (await import("../features/auth/PopupCompletePage")).PopupCompletePage }) },
+  { path: "/account", lazy: async () => ({ Component: (await import("../features/account/AccountPage")).AccountPage }) },
   {
     element: <RequireAccess status="active" />,
     children: [
-      { path: "/rules", element: <RulesPage /> },
-      { path: "/rules/new", element: <RuleEditorPage /> },
-      { path: "/rules/:ruleId", element: <RuleEditorPage /> },
-      { path: "/settings/notifications", element: <PushDeerSettingsPage /> },
+      { path: "/rules", lazy: async () => ({ Component: (await import("../features/rules/RulesPage")).RulesPage }) },
+      { path: "/rules/new", lazy: async () => ({ Component: (await import("../features/rules/RuleEditorPage")).RuleEditorPage }) },
+      { path: "/rules/:ruleId", lazy: async () => ({ Component: (await import("../features/rules/RuleEditorPage")).RuleEditorPage }) },
+      { path: "/settings/notifications", lazy: async () => ({ Component: (await import("../features/channels/PushDeerSettingsPage")).PushDeerSettingsPage }) },
     ],
   },
-  { path: "/admin/users", element: <AdminUsersPage /> },
+  { path: "/admin/users", lazy: async () => ({ Component: (await import("../features/admin/AdminUsersPage")).AdminUsersPage }) },
 ]);

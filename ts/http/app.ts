@@ -3,6 +3,7 @@ import { AccessRepository } from "../app-db/access-repository";
 import { createAuth } from "../auth/config";
 import { parseAdminEmails } from "../auth/admin-emails";
 import { healthRoutes } from "./routes/health";
+import { jiushiSyncTriggerRoutes } from "./routes/jiushi-sync-trigger";
 import { meRoutes } from "./routes/me";
 import { channelsRoutes } from "./routes/channels";
 import { rulesRoutes } from "./routes/rules";
@@ -79,6 +80,7 @@ export function createApp(deps?: AppDependencies) {
       return auth.handler(c.req.raw);
     })
     .route("/", healthRoutes)
+    .route("/", jiushiSyncTriggerRoutes)
     .route("/", slotsRoutes)
     .route("/", authenticated)
     .route("/", adminApp)

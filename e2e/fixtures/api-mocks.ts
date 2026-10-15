@@ -7,18 +7,22 @@ export async function mockApi(page: Page, path: string, response: unknown) {
 }
 
 export function mockSlotsResponse(overrides = {}) {
+  const today = new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10);
+  const tomorrow = new Date(Date.parse(today + "T00:00:00+08:00") + 86400_000 + 8 * 3600_000).toISOString().slice(0, 10);
   return {
-    source: "usthing",
-    sourceName: "香港科技大学",
+    source: "jiushi",
+    sourceName: "上海万体汇羽毛球馆",
     count: 3,
-    startDate: "2026-06-09",
-    endDate: "2026-06-23",
+    startDate: today,
+    endDate: tomorrow,
+    lastSyncedAt: new Date().toISOString(),
+    sourceState: "ready",
     lastUpdatedAt: new Date().toISOString(),
     warnings: [],
     slots: [
-      { Date: "2026-06-10", StartTime: "18:00", EndTime: "19:00", FacilityID: "2", Status: "Available" },
-      { Date: "2026-06-10", StartTime: "19:00", EndTime: "20:00", FacilityID: "3", Status: "Available" },
-      { Date: "2026-06-10", StartTime: "20:00", EndTime: "21:00", FacilityID: "5", Status: "Available" },
+      { Date: tomorrow, StartTime: "18:00", EndTime: "19:00", FacilityID: "113", Status: "Available" },
+      { Date: tomorrow, StartTime: "19:00", EndTime: "20:00", FacilityID: "114", Status: "Available" },
+      { Date: tomorrow, StartTime: "20:00", EndTime: "21:00", FacilityID: "115", Status: "Available" },
     ],
     availableSources: [
       { key: "usthing", name: "香港科技大学" },

@@ -1,16 +1,20 @@
+> **Final standalone snapshot (2026-10-15).** Maintenance is paused. This repository preserves the independent implementation and its existing integrations. The deployment command is disabled to keep this historical snapshot from replacing the active service.
+
 # CourtSync
 
 Badminton court availability monitor with rule-based notifications.
 
 ## Architecture
 
-- **Frontend**: React SPA (Vite + Tailwind CSS)
-- **API**: Hono (private, same-origin only)
+- **Frontend**: React SPA, seven-day planner with court details and continuous-duration filters (Vite + Tailwind CSS)
+- **API**: Hono (public availability snapshots; authenticated, same-origin account features)
 - **Auth**: Google OAuth via Better Auth
-- **Storage**: Cloudflare D1 (APP_DB, DB, JIUSHI_DB)
+- **Storage**: Cloudflare D1 (APP_DB, DB, JIUSHI_DB), published KV snapshots and five-minute edge responses
 - **Delivery**: Cloudflare Queues → PushDeer
 
-Live: <https://sports.anserlabs.com/> · GitHub: <https://github.com/kongdayan/CourtSync>
+Historical deployment URL: <https://sports.anserlabs.com/> · GitHub: <https://github.com/kongdayan/CourtSync>
+
+Availability, refresh behavior, quotas and verification: [场地总览与容量说明](docs/availability-and-capacity.md).
 
 ## User States
 
@@ -38,9 +42,9 @@ npm run benchmark:matching
 
 ## Deployment
 
-```bash
-npm run deploy
-```
+This final standalone snapshot is retained for reference and local reproduction.
+`npm run deploy` exits before building or uploading. The existing bindings remain
+as historical configuration; this repository no longer publishes updates.
 
 ## Secrets
 

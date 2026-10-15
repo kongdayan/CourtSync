@@ -3,66 +3,18 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { DashboardPage } from "../../src/web/features/dashboard/DashboardPage";
+vi.mock("../../src/web/lib/api", () => ({ apiFetch: vi.fn() }));
 
-// Mock the API
-vi.mock("../../src/web/lib/api", () => ({
-  apiFetch: vi.fn(),
-}));
-
-const slotsResponse = {
-  source: "usthing",
-  sourceName: "香港科技大学",
-  count: 0,
-  startDate: "2026-06-09",
-  endDate: "2026-06-23",
-  lastUpdatedAt: new Date().toISOString(),
-  warnings: [],
-  slots: [],
-  availableSources: [
-    { key: "usthing", name: "香港科技大学" },
-    { key: "jiushi", name: "上海万体汇羽毛球馆" },
-  ],
-};
-
-describe("DashboardPage", () => {
-  it("shows signed-in navigation on the home page", async () => {
+describe("public dashboard", () => {
+  it("keeps promotion links and hides login and reminders without loading a session", async () => {
     const { apiFetch } = await import("../../src/web/lib/api");
-    // useMe calls /me first, then the dashboard calls /slots
-    vi.mocked(apiFetch)
-      .mockResolvedValueOnce({
-        user: { id: "1", email: "test@example.com", name: "Test User" },
-        access: { role: "admin", status: "active", ruleLimit: 2 },
-      })
-      .mockResolvedValueOnce(slotsResponse);
-
-    const queryClient = new QueryClient({
-      defaultOptions: { queries: { retry: false } },
-    });
-    const router = createMemoryRouter(
-      [{ path: "/", element: <DashboardPage /> }],
-      { initialEntries: ["/"] }
-    );
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <RouterProvider router={router} />
-      </QueryClientProvider>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText("Test User")).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: "通知规则" })).toHaveAttribute("href", "/rules");
-      expect(screen.getByRole("link", { name: "推送设置" })).toHaveAttribute(
-        "href",
-        "/settings/notifications",
-      );
-      expect(screen.getByRole("link", { name: "用户管理" })).toHaveAttribute(
-        "href",
-        "/admin/users",
-      );
-      expect(screen.getByRole("button", { name: "退出" })).toBeInTheDocument();
-    });
-
-    expect(screen.queryByRole("link", { name: "账户" })).not.toBeInTheDocument();
+    vi.mocked(apiFetch).mockResolvedValue({ slots: [], count: 0, warnings: [], sourceState: "unavailable" });
+    const router = createMemoryRouter([{ path: "/", element: <DashboardPage /> }], { initialEntries: ["/"] });
+    render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RouterProvider router={router} /></QueryClientProvider>);
+    await waitFor(() => expect(apiFetch).toHaveBeenCalled());
+    expect(vi.mocked(apiFetch).mock.calls.every(([path]) => path.startsWith("/slots?"))).toBe(true);
+    expect(screen.queryByRole("link", { name: /登录|有场时提醒我/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /@Kook91513056/ })).toHaveAttribute("href", "https://x.com/Kook91513056");
+    expect(screen.getByRole("link", { name: /@kongdayan/ })).toHaveAttribute("href", "https://github.com/kongdayan");
   });
 });

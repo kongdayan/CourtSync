@@ -11,6 +11,7 @@ import {
 } from "../types";
 import { getTodayUTC8, getDateDaysAhead } from "../utils/time";
 import { persistSlots } from "../db/slots";
+import { publishSlotsSnapshot } from "../cache/slots-snapshot";
 
 // Augment the global Env type with sync-specific optional fields not present
 // in the auto-generated type from wrangler config.
@@ -131,7 +132,9 @@ function parseJiushiConfig(
     venueId,
     allowedGroundIds,
     maxDays,
-    proxyUrl: env?.JIUSHI_PROXY_URL?.trim() || undefined,
+    proxyUrl: env.JIUSHI_PROXY
+      ? "http://jiushi-proxy.internal"
+      : env?.JIUSHI_PROXY_URL?.trim() || undefined,
     proxyToken: env?.JIUSHI_PROXY_TOKEN?.trim() || undefined,
   };
 }
@@ -229,7 +232,9 @@ async function runJiushiTimeslotSync(
     allowedGroundIds: config.allowedGroundIds,
     startDate: effectiveStart,
     endDate: effectiveEnd,
-    fetchImpl,
+    fetchImpl: env.JIUSHI_PROXY && config.proxyUrl
+      ? env.JIUSHI_PROXY.fetch.bind(env.JIUSHI_PROXY)
+      : fetchImpl,
     warnings,
     maxDays: config.maxDays,
     proxyUrl: config.proxyUrl,
@@ -279,10 +284,25 @@ export async function runTimeslotSync(
   startDate?: string,
   endDate?: string
 ): Promise<TimeslotSyncResult> {
-  if (source === "jiushi") {
-    return runJiushiTimeslotSync(env, fetchImpl, startDate, endDate);
+  let result: TimeslotSyncResult;
+  try {
+    result = source === "jiushi"
+      ? await runJiushiTimeslotSync(env, fetchImpl, startDate, endDate)
+      : await runUSThingTimeslotSync(env, fetchImpl, startDate, endDate);
+  } catch (error) {
+    await publishSlotsSnapshot(env, {
+      source, status: "failed", slots: [], warnings: ["Source sync failed"],
+      startDate: getTodayUTC8(), endDate: getDateDaysAhead(14), generatedAt: new Date(),
+    }).catch((publishError: unknown) => console.error("Failed to publish source outage", publishError));
+    throw error;
   }
-  return runUSThingTimeslotSync(env, fetchImpl, startDate, endDate);
+  try {
+    await publishSlotsSnapshot(env, result);
+  } catch (error) {
+    console.error("Failed to publish public snapshot", error);
+    result.warnings.push("Unable to publish the public slot snapshot.");
+  }
+  return result;
 }
 
 export async function syncConfiguredSources(

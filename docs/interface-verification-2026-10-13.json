@@ -1,0 +1,94 @@
+{
+  "date": "2026-10-13",
+  "production": "https://sports.anserlabs.com/",
+  "version": "7d16fe28-340a-4536-ab79-439e81595a29",
+  "previousVersion": "21ad1afc-81f3-4cb5-86ed-bcf1d41c0fb4",
+  "validation": {
+    "typecheck": "passed",
+    "webUnitTests": 17,
+    "browserTests": 60,
+    "browserProjects": [
+      "chromium-desktop",
+      "chromium-mobile",
+      "webkit-desktop",
+      "webkit-mobile"
+    ],
+    "widths": [
+      320,
+      390,
+      768,
+      1440
+    ],
+    "pngChecks": "PNG signature, dimensions, nonblank pixels, both languages and themes, current filters and selection",
+    "gitDiffCheck": "passed"
+  },
+  "liveBrowser": {
+    "measuredAt": "2026-10-13T09:38:19.285Z",
+    "browser": "WebKit iPhone 13 simulation",
+    "first": {
+      "width": 390,
+      "scrollWidth": 390,
+      "columns": 8,
+      "details": 0,
+      "durations": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6"
+      ],
+      "promotion": [
+        {
+          "text": "X · @Kook91513056 ",
+          "url": "https://x.com/Kook91513056"
+        },
+        {
+          "text": "GitHub · @kongdayan ",
+          "url": "https://github.com/kongdayan"
+        }
+      ],
+      "meta": "上海万体汇羽毛球馆35 块场地采集于 10/13 17:00",
+      "filters": 3
+    },
+    "panel": {
+      "position": "fixed",
+      "top": 265.609375,
+      "bottom": 664,
+      "boardWidth": 346,
+      "text": "时段详情你选择的时段10月14日 周三08:00—10:0014 块场地可用羽毛球 7空闲羽毛球 8空闲羽毛球 9空闲羽毛球 10空闲羽毛球 11空闲羽毛球 12空闲羽毛球 13空闲羽毛球 14空闲羽毛球 15空闲羽毛球 16空闲羽毛球 17空闲羽毛球 18空闲羽毛球 19空闲羽毛球 20空闲前往小程序预约微信打开「久事体育」，进入上海万体汇羽毛球馆，选择上面的日期、时间和场地。余位可能随时变化，请以小程序确认页为准。"
+    },
+    "preferences": {
+      "language": "en",
+      "dark": true,
+      "width": 390,
+      "scrollWidth": 390,
+      "loginLinks": 0
+    },
+    "rangeMediaQueries": false,
+    "download": {
+      "filename": "courtsync-jiushi-2026-10-13-2h-zh.png",
+      "bytes": 394452
+    },
+    "sessionRequests": 0,
+    "errors": []
+  },
+  "changes": [
+    "Mobile details closed initially; fixed bottom panel opens on selection and is dismissible.",
+    "Desktop details can collapse; mobile panel never narrows the seven-day grid.",
+    "Three labeled selectors; source and actions have a separate mobile row.",
+    "Compiled CSS uses min/max-width breakpoints for older WebViews.",
+    "Original X and GitHub promotion links restored.",
+    "Continuous duration supports 1-6 hours.",
+    "Download saves the current rendered schedule as a local PNG.",
+    "Chinese/English and day/night choices persist locally.",
+    "Login and reminder entry points hidden; no homepage session request."
+  ],
+  "notes": [
+    "WebKit iPhone simulation is not verification on the physical WeChat device.",
+    "Source collection remains hourly 08:00-22:00; browser snapshot checks remain every 5 minutes.",
+    "Worker synchronization, public snapshot caching and HKUST credentials unchanged in this interface revision.",
+    "No bookings, payments or test notifications sent.",
+    "Existing working-tree changes preserved; no commit made."
+  ]
+}

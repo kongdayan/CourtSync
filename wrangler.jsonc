@@ -17,9 +17,20 @@
   },
   "kv_namespaces": [
     {
+      "binding": "SLOTS_CACHE",
+      "id": "26ffdfa6533648ca88e7b85448c3b1ce"
+    },
+    {
       "binding": "hkust_token",
       "id": "e73e6d33bad345538d7b6142c6b0c230",
       "preview_id": "bed13acf84de498db5695ac4bfcdf7a2"
+    }
+  ],
+  "vpc_services": [
+    {
+      "binding": "JIUSHI_PROXY",
+      "service_id": "01a133e0-127d-77d3-b42e-af9c5f29662c",
+      "remote": true
     }
   ],
   "d1_databases": [
@@ -82,6 +93,7 @@
       "USTHING_PASSWORD",
       "JIUSHI_PROXY_URL",
       "JIUSHI_PROXY_TOKEN",
+      "JIUSHI_SYNC_TRIGGER_SECRET",
       "ADMIN_PUSHDEER_KEY"
     ]
   }

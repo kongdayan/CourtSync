@@ -10,6 +10,7 @@ export default defineConfig(async () => {
   return {
     plugins: [
       cloudflareTest({
+        remoteBindings: false,
         wrangler: { configPath: "./wrangler.jsonc" },
         miniflare: {
           bindings: {

@@ -2,15 +2,16 @@ import { runScheduledSync } from "./sync/orchestrator";
 import { createApp } from "./http/app";
 import { handleQueueBatch } from "./notifications/queue-consumer";
 
+// Immutable routing is shared; bindings and session work remain request scoped.
+const app = createApp();
+
 export default {
   async fetch(
     request: Request,
     env: Env,
     ctx: ExecutionContext
   ): Promise<Response> {
-    const url = new URL(request.url);
-
-    return createApp().fetch(request, env, ctx);
+    return app.fetch(request, env, ctx);
   },
 
   async queue(batch: MessageBatch<{ outboxId: string }>, env: Env): Promise<void> {

@@ -20,3 +20,8 @@ dist/
 worker-configuration.d.ts
 courtsync
 jiushi-proxy
+
+# Generated verification output
+test-results/
+playwright-report/
+coverage/

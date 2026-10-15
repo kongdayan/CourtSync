@@ -1,0 +1,83 @@
+{
+  "production": "https://sports.anserlabs.com/",
+  "version": "a474e94d-d56c-454e-8d27-2851853a918b",
+  "previousVersion": "7d16fe28-340a-4536-ab79-439e81595a29",
+  "validation": {
+    "typecheck": "passed",
+    "webUnitTests": 20,
+    "dashboardBrowserTests": 56,
+    "projects": [
+      "chromium-desktop",
+      "chromium-mobile",
+      "webkit-desktop",
+      "webkit-mobile"
+    ],
+    "gitDiffCheck": "passed"
+  },
+  "liveBrowser": {
+    "origin": "https://sports.anserlabs.com/",
+    "collection": "上海万体汇羽毛球馆\n35 块场地\n采集于 10/13 18:00",
+    "matchCount": "20 个合适时段",
+    "measuredAt": "2026-10-13T10:04:48.938Z",
+    "browser": "WebKit iPhone 13 simulation",
+    "initial": {
+      "viewport": 664,
+      "top": 193.765625,
+      "bottomGap": 32,
+      "width": 366,
+      "height": 438.234375,
+      "bodyHeight": 310,
+      "bodyScrollHeight": 1641
+    },
+    "matched": 12,
+    "controls": [
+      {
+        "text": "返回时段筛选",
+        "label": null,
+        "top": 202.765625,
+        "bottom": 246.765625,
+        "height": 44
+      },
+      {
+        "text": "",
+        "label": "关闭详情面板",
+        "top": 202.765625,
+        "bottom": 246.765625,
+        "height": 44
+      },
+      {
+        "text": "返回七天总览",
+        "label": null,
+        "top": 577,
+        "bottom": 621,
+        "height": 44
+      }
+    ],
+    "returned": "2",
+    "english": {
+      "width": 320,
+      "scrollWidth": 320,
+      "bodyScrollWidth": 294,
+      "bodyWidth": 294
+    },
+    "filterRequests": 0,
+    "errors": []
+  },
+  "behavior": [
+    "Floating mobile panel leaves 32px plus the system safe area below and 12px on each side.",
+    "Header and footer navigation stay visible while the body scrolls; controls have 44px touch targets.",
+    "Back to filters retains earliest start, latest finish, duration and selected weekdays.",
+    "Back to overview closes the panel and restores focus without scrolling the page.",
+    "Search filters all seven-day openings before limiting displayed results; more results expand in the same panel.",
+    "Every result fits its entire same-court continuous duration inside the requested time window.",
+    "Morning, afternoon, evening, custom half-hour windows, 1-6 hours and multiple weekdays are supported.",
+    "Search respects the main court selection and uses a shared duration; selecting a result reveals it in the full-day grid.",
+    "A visible results button jumps directly from the filters to matching openings.",
+    "Search is local; no new upstream or D1 queries and no additional slots request during the verified live interactions."
+  ],
+  "notes": [
+    "WebKit iPhone simulation is not physical WeChat verification.",
+    "Existing working-tree changes preserved; no commit made.",
+    "No bookings, payments, credentials or reminders changed."
+  ]
+}

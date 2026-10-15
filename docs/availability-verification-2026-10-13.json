@@ -1,0 +1,258 @@
+{
+  "date": "2026-10-13",
+  "production": "https://sports.anserlabs.com/",
+  "version": "21ad1afc-81f3-4cb5-86ed-bcf1d41c0fb4",
+  "deployment": "c4c46805-9758-4462-a082-aa4a3f28cd76",
+  "previousVersion": "e2375b18-4152-472a-9594-e59f57c611de",
+  "validation": {
+    "typecheck": "passed",
+    "workerTests": 92,
+    "webTests": 13,
+    "browserTests": 16,
+    "widths": [
+      320,
+      390,
+      768,
+      1440
+    ],
+    "publicColdConcurrency": 24,
+    "d1CallsFromPublicSlots": 0,
+    "fullAppPublicSessionBypass": "passed"
+  },
+  "controlledComparison": [
+    {
+      "version": "before",
+      "width": 1440,
+      "readyMs": 179,
+      "nodes": 8268,
+      "bodyHeight": 9901,
+      "scrollWidth": 1440,
+      "columns": 9,
+      "buttons": 0,
+      "jsBytes": 392046,
+      "errors": []
+    },
+    {
+      "version": "before-compact",
+      "width": 1440,
+      "nodes": 4593,
+      "bodyHeight": 1951,
+      "scrollWidth": 1440
+    },
+    {
+      "version": "after",
+      "width": 1440,
+      "readyMs": 69,
+      "nodes": 520,
+      "bodyHeight": 1296,
+      "scrollWidth": 1440,
+      "columns": 8,
+      "buttons": 98,
+      "jsBytes": 343147,
+      "errors": []
+    },
+    {
+      "version": "before",
+      "width": 390,
+      "readyMs": 191,
+      "nodes": 8268,
+      "bodyHeight": 24727,
+      "scrollWidth": 390,
+      "columns": 9,
+      "buttons": 0,
+      "jsBytes": 392046,
+      "errors": []
+    },
+    {
+      "version": "before-compact",
+      "width": 390,
+      "nodes": 4593,
+      "bodyHeight": 2091,
+      "scrollWidth": 390
+    },
+    {
+      "version": "after",
+      "width": 390,
+      "readyMs": 71,
+      "nodes": 520,
+      "bodyHeight": 1567,
+      "scrollWidth": 390,
+      "columns": 8,
+      "buttons": 98,
+      "jsBytes": 343147,
+      "errors": []
+    }
+  ],
+  "initialLiveCache": {
+    "measuredAt": "2026-10-13T08:40:21.119Z",
+    "first": {
+      "status": 200,
+      "ms": 1026,
+      "headers": {
+        "cache-control": "public, max-age=300, must-revalidate",
+        "age": "0",
+        "etag": "W/\"5441a8a9f07e0f5c9f74ddcc9359c8f187bf9f5295692ab4a4d5b535f90d3466\"",
+        "x-courtsync-cache": "MISS",
+        "x-courtsync-cache-ttl": "300",
+        "content-encoding": "zstd",
+        "cf-ray": "a49d09f2cad53050-LAX"
+      },
+      "bytes": 434399,
+      "source": "jiushi",
+      "count": 3185,
+      "startDate": "2026-10-13",
+      "endDate": "2026-10-19",
+      "lastSyncedAt": "2026-10-13T08:00:15.179Z",
+      "sourceState": "ready",
+      "dates": [
+        "2026-10-13",
+        "2026-10-14",
+        "2026-10-15",
+        "2026-10-16",
+        "2026-10-17",
+        "2026-10-18",
+        "2026-10-19"
+      ]
+    },
+    "second": {
+      "status": 200,
+      "ms": 180,
+      "headers": {
+        "cache-control": "public, max-age=300, must-revalidate",
+        "age": "0",
+        "etag": "W/\"5441a8a9f07e0f5c9f74ddcc9359c8f187bf9f5295692ab4a4d5b535f90d3466\"",
+        "x-courtsync-cache": "HIT",
+        "x-courtsync-cache-ttl": "300",
+        "content-encoding": "zstd",
+        "cf-ray": "a49d09f5ca2b3050-LAX"
+      },
+      "bytes": 434399,
+      "source": "jiushi",
+      "count": 3185,
+      "startDate": "2026-10-13",
+      "endDate": "2026-10-19",
+      "lastSyncedAt": "2026-10-13T08:00:15.179Z",
+      "sourceState": "ready",
+      "dates": [
+        "2026-10-13",
+        "2026-10-14",
+        "2026-10-15",
+        "2026-10-16",
+        "2026-10-17",
+        "2026-10-18",
+        "2026-10-19"
+      ]
+    },
+    "conditional": {
+      "status": 304,
+      "ms": 147,
+      "headers": {
+        "cache-control": "public, max-age=300, must-revalidate",
+        "age": "0",
+        "etag": "\"5441a8a9f07e0f5c9f74ddcc9359c8f187bf9f5295692ab4a4d5b535f90d3466\"",
+        "x-courtsync-cache": "HIT",
+        "x-courtsync-cache-ttl": "300",
+        "content-encoding": null,
+        "cf-ray": "a49d09f6eca93050-LAX"
+      },
+      "bytes": 0
+    },
+    "concurrent": {
+      "statuses": [
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200
+      ],
+      "cacheHits": 0,
+      "count": 4165,
+      "p95Ms": 615
+    },
+    "hkust": {
+      "status": 200,
+      "ms": 272,
+      "headers": {
+        "cache-control": "public, max-age=300, must-revalidate",
+        "age": "0",
+        "etag": "W/\"c1a6e6694d5d5b2de71349fb930f442fce235e4496f79f68ddeb3edf74ad8627\"",
+        "x-courtsync-cache": "MISS",
+        "x-courtsync-cache-ttl": "300",
+        "content-encoding": "zstd",
+        "cf-ray": "a49d09fbb8253050-LAX"
+      },
+      "bytes": 479,
+      "source": "usthing",
+      "count": 0,
+      "startDate": "2026-10-13",
+      "endDate": "2026-10-19",
+      "lastSyncedAt": null,
+      "sourceState": "unavailable",
+      "dates": []
+    }
+  },
+  "afterExpiry": {
+    "measuredAt": "2026-10-13T08:47:22.452Z",
+    "status": 200,
+    "cache": "HIT",
+    "age": "70",
+    "cacheControl": "public, max-age=230, must-revalidate",
+    "count": 3115,
+    "lastSyncedAt": "2026-10-13T08:40:21.959Z",
+    "startDate": "2026-10-13",
+    "endDate": "2026-10-19",
+    "dates": [
+      "2026-10-13",
+      "2026-10-14",
+      "2026-10-15",
+      "2026-10-16",
+      "2026-10-17",
+      "2026-10-18",
+      "2026-10-19"
+    ]
+  },
+  "d1Usage": {
+    "measuredAt": "2026-10-13T08:42:38.120Z",
+    "scope": "whole account, today UTC",
+    "rowsRead": 112557,
+    "rowsWritten": 12537
+  },
+  "liveBrowser": {
+    "lcpMs": 495,
+    "cls": 0,
+    "fieldData": false,
+    "mobileWidth": 390,
+    "mobileScrollWidth": 390,
+    "dayColumns": 7,
+    "liveDecodedPayloadBytes": 424907,
+    "liveEncodedPayloadBytes": 11430
+  },
+  "fallback": {
+    "calendar": "08..22:05:00 Asia/Shanghai",
+    "firstSync": {
+      "ok": true,
+      "slotsCount": 4095,
+      "lastSyncedAt": "2026-10-13T08:40:21.959Z"
+    },
+    "secondSync": {
+      "ok": true,
+      "skipped": true,
+      "reason": "fresh_snapshot"
+    }
+  },
+  "notes": [
+    "Public availability does not query D1 or upstream, even on cold misses.",
+    "Cache API is per location; KV publication is eventually consistent.",
+    "Actual billing plan was not verified; capacity budget uses published Free limits.",
+    "HKUST credentials are unchanged.",
+    "No bookings, payments or test notifications sent.",
+    "Existing working-tree changes preserved; no commit made."
+  ]
+}

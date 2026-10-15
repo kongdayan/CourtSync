@@ -144,6 +144,6 @@ test("ships legacy-compatible responsive CSS for WeChat WebView", async ({ page 
     expect(css).not.toMatch(/@media[^{}]*\(\s*width\s*[<>]=/);
   }
   await page.setViewportSize({ width: 375, height: 812 });
-  const layout = await page.locator(".planner-content").evaluate(el => ({ columns: getComputedStyle(el).gridTemplateColumns, compact: el.classList.contains("compact-layout") }));
-  expect(layout.compact).toBe(true); await expectNoHorizontalOverflow(page);
+  await expect(page.locator(".planner-content")).toHaveClass(/compact-layout/);
+  await expectNoHorizontalOverflow(page);
 });
